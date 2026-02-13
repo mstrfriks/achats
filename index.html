@@ -91,6 +91,11 @@ function norm(s){
  return (s||"").trim().toLowerCase();
 }
 
+function cleanRef(v){
+ const r = (v||"").trim();
+ return r ? r : "Sans référence";
+}
+
 function dateValue(d){
  if(!d || !d.includes("/")) return 0;
  const [j,m,a]=d.split("/");
@@ -165,7 +170,7 @@ function buildChart(rows){
 
  const months = Object.keys(map).sort();
  const labels = months.map(monthLabel);
- const refs = [...new Set(rows.map(r=>r.ref).filter(Boolean))];
+ const refs = [...new Set(rows.map(r=>r.ref))];
 
  const datasets = refs.map(ref=>({
    label: ref,
@@ -202,12 +207,13 @@ fetch("data.csv")
     rows.forEach(row=>{
       if(!row[0]) return;
 
+      const ref = cleanRef(row[7]);
       const d=row[1];
       const m=monthKey(d);
 
       const obj={
         f: row[0],
-        ref: row[7],
+        ref: ref,
         month: m,
         arr:[
           row[0],
@@ -215,13 +221,13 @@ fetch("data.csv")
           row[2],
           row[3],
           row[6],
-          row[7]
+          ref
         ]
       };
 
       DATA.push(obj);
       fset.add(obj.f);
-      if(obj.ref) rset.add(obj.ref);
+      rset.add(ref);
       if(m) mset.add(m);
     });
 
