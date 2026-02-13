@@ -92,9 +92,16 @@ function norm(s){
 }
 
 function monthKey(d){
- if(!d || !d.includes("/")) return "";
+ if(!d || !d.includes("/")) return null;
  const [j,m,a]=d.split("/");
  return a+"-"+m;
+}
+
+function monthLabel(key){
+ if(!key) return "";
+ const [a,m]=key.split("-");
+ const names=["jan","fév","mar","avr","mai","jun","jul","aoû","sep","oct","nov","déc"];
+ return names[parseInt(m)-1]+" "+a;
 }
 
 let DATA=[];
@@ -138,10 +145,11 @@ function buildChart(rows){
  rows.forEach(r=>{
    if(!r.month) return;
    if(!map[r.month]) map[r.month]={};
-   map[r.month][r.ref] = (map[r.month][r.ref]||0) + eur(r.arr[3]);
+   map[r.month][r.ref]=(map[r.month][r.ref]||0)+eur(r.arr[3]);
  });
 
  const months = Object.keys(map).sort();
+ const labels = months.map(monthLabel);
  const refs = [...new Set(rows.map(r=>r.ref).filter(Boolean))];
 
  const datasets = refs.map(ref=>({
@@ -153,7 +161,7 @@ function buildChart(rows){
 
  chart = new Chart(chartEl,{
    type:"bar",
-   data:{ labels:months, datasets },
+   data:{ labels, datasets },
    options:{
      responsive:true,
      plugins:{ legend:{ position:"bottom" }},
@@ -170,18 +178,17 @@ fetch("data.csv")
   skipEmptyLines:true,
   complete: res => {
 
-    const rows = res.data.slice(2); // saute titre + header
+    const rows = res.data.slice(2);
 
     const fset=new Set();
     const rset=new Set();
     const mset=new Set();
 
     rows.forEach(row=>{
-
       if(!row[0]) return;
 
-      const d = row[1];
-      const m = monthKey(d);
+      const d=row[1];
+      const m=monthKey(d);
 
       const obj={
         f: row[0],
@@ -205,7 +212,7 @@ fetch("data.csv")
 
     [...fset].sort().forEach(v=>fFilter.innerHTML+=`<option>${v}</option>`);
     [...rset].sort().forEach(v=>rFilter.innerHTML+=`<option>${v}</option>`);
-    [...mset].sort().forEach(v=>mFilter.innerHTML+=`<option>${v}</option>`);
+    [...mset].sort().forEach(v=>mFilter.innerHTML+=`<option>${monthLabel(v)}</option>`);
 
     render();
   }
@@ -236,4 +243,3 @@ mFilter.onchange=render;
 
 </body>
 </html>
-
