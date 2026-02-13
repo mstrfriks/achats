@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <title>Suivi des achats</title>
-<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5"></script>
 
 <style>
 body{
@@ -12,7 +12,6 @@ body{
  margin:40px;
  color:#1d1d1f;
 }
-
 .card{
  background:white;
  border-radius:18px;
@@ -20,28 +19,10 @@ body{
  margin-bottom:20px;
  box-shadow:0 4px 20px rgba(0,0,0,0.06);
 }
-
-select{
- padding:10px 14px;
- border-radius:12px;
- border:1px solid #ddd;
-}
-
-table{
- width:100%;
- border-collapse:collapse;
- background:white;
- border-radius:18px;
- overflow:hidden;
-}
-
-th,td{
- padding:12px;
- border-bottom:1px solid #eee;
-}
-
+select{padding:10px;border-radius:12px;border:1px solid #ddd}
+table{width:100%;border-collapse:collapse;background:white;border-radius:18px;overflow:hidden}
+th,td{padding:12px;border-bottom:1px solid #eee}
 th{cursor:pointer;background:#fafafa}
-
 .kpi{font-size:22px;font-weight:600}
 </style>
 </head>
@@ -59,7 +40,7 @@ th{cursor:pointer;background:#fafafa}
 Total HT filtré : <span id="total">0 €</span>
 </div>
 
-<table id="tbl">
+<table>
 <thead>
 <tr>
 <th data-col="0">Fournisseur</th>
@@ -70,23 +51,19 @@ Total HT filtré : <span id="total">0 €</span>
 <th data-col="5">Réf gestion</th>
 </tr>
 </thead>
-<tbody></tbody>
+<tbody id="tbody"></tbody>
 </table>
 
 <script>
 
-const url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS80EbOdyJxdT8hmQAux0KJXM-LHsGKFP5eEGQuo28JFid6CwEVCApcOJ-0GpncdDul4Q97VvmjdmTm/pub?output=csv";
-
-function norm(s){
- return (s||"")
-  .trim()
-  .toLowerCase()
-  .normalize("NFD")
-  .replace(/\p{Diacritic}/gu,"");
-}
+const URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS80EbOdyJxdT8hmQAux0KJXM-LHsGKFP5eEGQuo28JFid6CwEVCApcOJ-0GpncdDul4Q97VvmjdmTm/pub?output=csv";
 
 function eur(v){
  return parseFloat((v||"").replace(/[€\s]/g,"").replace(",", ".")) || 0;
+}
+
+function norm(s){
+ return (s||"").trim().toLowerCase();
 }
 
 let rows=[];
@@ -98,57 +75,56 @@ function render(){
  const f = norm(fFilter.value);
  const t = norm(tFilter.value);
 
- let out = rows.filter(r =>
-   (!f || r.fKey===f) &&
-   (!t || r.tKey===t)
+ const out = rows.filter(r =>
+   (!f || norm(r[0])===f) &&
+   (!t || norm(r[4])===t)
  );
 
  out.sort((a,b)=>{
-   if(sortCol===3) return (eur(a.val[3])-eur(b.val[3]))*sortDir;
-   return a.val[sortCol].localeCompare(b.val[sortCol])*sortDir;
+   if(sortCol===3) return (eur(a[3])-eur(b[3]))*sortDir;
+   return a[sortCol].localeCompare(b[sortCol])*sortDir;
  });
 
- let total=0;
  tbody.innerHTML="";
+ let total=0;
 
  out.forEach(r=>{
-   total+=eur(r.val[3]);
-   tbody.innerHTML += `<tr>${r.val.map(c=>`<td>${c}</td>`).join("")}</tr>`;
+   total+=eur(r[3]);
+   tbody.innerHTML += `<tr>${r.map(c=>`<td>${c}</td>`).join("")}</tr>`;
  });
 
  totalEl.textContent = total.toLocaleString()+" €";
 }
 
-Papa.parse(url,{
+Papa.parse(URL,{
  download:true,
  skipEmptyLines:true,
  complete: res => {
 
-   const raw = res.data.slice(2);
+   const data = res.data;
 
-   const fset=new Map();
-   const tset=new Map();
+   // 🔎 détecte ligne d’en-tête
+   const headerIndex = data.findIndex(r =>
+     r.join(" ").toLowerCase().includes("date") &&
+     r.join(" ").toLowerCase().includes("fourn")
+   );
 
-   raw.forEach(r=>{
+   const body = data.slice(headerIndex+1);
+
+   const fset=new Set();
+   const tset=new Set();
+
+   body.forEach(r=>{
      if(!r[0]) return;
 
-     const obj={
-       val:[r[0].trim(),r[1],r[2],r[3],r[6],r[7]],
-       fKey:norm(r[0]),
-       tKey:norm(r[6])
-     };
-
-     rows.push(obj);
-
-     fset.set(obj.fKey,r[0].trim());
-     tset.set(obj.tKey,r[6].trim());
+     const row=[r[0],r[1],r[2],r[3],r[6],r[7]];
+     rows.push(row);
+     fset.add(r[0]);
+     tset.add(r[6]);
    });
 
-   [...fset.entries()].sort().forEach(([k,v]) =>
-     fFilter.innerHTML+=`<option value="${v}">${v}</option>`);
-
-   [...tset.entries()].sort().forEach(([k,v]) =>
-     tFilter.innerHTML+=`<option value="${v}">${v}</option>`);
+   [...fset].sort().forEach(v=>fFilter.innerHTML+=`<option>${v}</option>`);
+   [...tset].sort().forEach(v=>tFilter.innerHTML+=`<option>${v}</option>`);
 
    render();
  }
@@ -167,7 +143,7 @@ document.querySelectorAll("th").forEach(th=>{
 
 const fFilter=document.getElementById("fFilter");
 const tFilter=document.getElementById("tFilter");
-const tbody=document.querySelector("#tbl tbody");
+const tbody=document.getElementById("tbody");
 const totalEl=document.getElementById("total");
 
 </script>
