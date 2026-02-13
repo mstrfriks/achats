@@ -134,8 +134,9 @@ fetch("data.csv")
 .then(r=>r.text())
 .then(csv => {
 
- Papa.parse(csv,{
+Papa.parse(csv,{
   skipEmptyLines:true,
+  delimiter: ";",
   complete: res => {
 
     const rows = res.data.slice(2); // saute titre + header
@@ -246,4 +247,5 @@ mFilter.onchange=render
 </script>
 </body>
 </html>
+
 
