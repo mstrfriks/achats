@@ -2,44 +2,120 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>Test CSV</title>
+<title>Suivi achats</title>
+
+<link rel="stylesheet"
+ href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
+<style>
+body { font-family: Arial; margin:20px }
+select { margin-right:10px; padding:5px }
+.kpi { font-size:18px; font-weight:bold; margin:10px 0 }
+</style>
 </head>
+
 <body>
 
-<h2>Test chargement Google Sheet CSV</h2>
+<h2>📊 Suivi des achats</h2>
 
-<table border="1" id="t"></table>
+<select id="fournisseurFilter"><option value="">Tous fournisseurs</option></select>
+<select id="typeFilter"><option value="">Tous types doc</option></select>
+
+<div class="kpi">Total HT filtré : <span id="total">0 €</span></div>
+
+<table id="t" class="display">
+<thead>
+<tr>
+<th>Fournisseur</th>
+<th>Date</th>
+<th>Commentaire</th>
+<th>€ HT</th>
+<th>Type doc</th>
+<th>Réf gestion</th>
+</tr>
+</thead>
+<tbody></tbody>
+</table>
 
 <script>
+
 const url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS80EbOdyJxdT8hmQAux0KJXM-LHsGKFP5eEGQuo28JFid6CwEVCApcOJ-0GpncdDul4Q97VvmjdmTm/pub?output=csv";
 
-fetch(url)
-.then(r => r.text())
-.then(txt => {
+function eur(v){
+ if(!v) return 0;
+ return parseFloat(v.replace(/[€\s]/g,"").replace(",", ".")) || 0;
+}
 
-  console.log("CSV reçu:", txt.slice(0,200));
+Papa.parse(url, {
+ download:true,
+ skipEmptyLines:true,
 
-  const rows = txt.split(/\r?\n/).map(r =>
-    r.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g)
-  );
+ complete: res => {
 
-  const table = document.getElementById("t");
+   const rows = res.data.slice(2); // saute titre + header
 
-  rows.slice(0,50).forEach(row => {
-    if(!row) return;
-    const tr = document.createElement("tr");
-    row.forEach(c => {
-      const td = document.createElement("td");
-      td.textContent = c.replace(/^"|"$/g,"");
-      tr.appendChild(td);
-    });
-    table.appendChild(tr);
-  });
+   const fset = new Set();
+   const tset = new Set();
 
-})
-.catch(e => {
-  document.body.innerHTML += "<p>ERREUR FETCH: "+e+"</p>";
+   rows.forEach(r => {
+
+     const fournisseur = r[0];
+     const date = r[1];
+     const comm = r[2];
+     const ht = r[3];
+     const type = r[6];
+     const ref = r[7];
+
+     if(!fournisseur) return;
+
+     fset.add(fournisseur);
+     tset.add(type);
+
+     $("#t tbody").append(`
+     <tr>
+       <td>${fournisseur}</td>
+       <td>${date}</td>
+       <td>${comm}</td>
+       <td>${ht}</td>
+       <td>${type}</td>
+       <td>${ref}</td>
+     </tr>`);
+   });
+
+   fset.forEach(v => $("#fournisseurFilter").append(`<option>${v}</option>`));
+   tset.forEach(v => $("#typeFilter").append(`<option>${v}</option>`));
+
+   window.dt = $('#t').DataTable({
+     pageLength:25,
+     order:[[1,"desc"]]
+   });
+
+   updateTotal();
+ }
 });
+
+function updateTotal(){
+ let s = 0;
+ dt.rows({search:'applied'}).every(function(){
+   s += eur(this.data()[3]);
+ });
+ $("#total").text(s.toLocaleString()+" €");
+}
+
+$("#fournisseurFilter").on("change", function(){
+ dt.column(0).search(this.value).draw();
+});
+
+$("#typeFilter").on("change", function(){
+ dt.column(4).search(this.value).draw();
+});
+
+$('#t').on('draw.dt', updateTotal);
+
 </script>
 
 </body>
