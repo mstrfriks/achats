@@ -132,9 +132,52 @@ function buildChart(rows){
 
 fetch("data.csv")
 .then(r=>r.text())
-.then(csv=>Papa.parse(csv,{
- skipEmptyLines:true,
- complete: res => {
+.then(csv => {
+
+ Papa.parse(csv,{
+  skipEmptyLines:true,
+  complete: res => {
+
+    const rows = res.data.slice(2); // saute titre + header
+
+    const fset=new Set(), rset=new Set(), mset=new Set();
+
+    rows.forEach(row=>{
+      if(!row[0]) return;
+
+      const d = row[1];
+      const m = monthKey(d);
+
+      const obj={
+        f: row[0],
+        ref: row[7],
+        month: m,
+        arr:[
+          row[0],
+          row[1],
+          row[2],
+          row[3],
+          row[6],
+          row[7]
+        ]
+      };
+
+      DATA.push(obj);
+      fset.add(obj.f);
+      rset.add(obj.ref);
+      mset.add(m);
+    });
+
+    fset.forEach(v=>fFilter.innerHTML+=`<option>${v}</option>`);
+    rset.forEach(v=>rFilter.innerHTML+=`<option>${v}</option>`);
+    mset.forEach(v=>mFilter.innerHTML+=`<option>${v}</option>`);
+
+    render();
+  }
+ })
+
+})
+
 
    const header=res.data.find(r=>r.join(" ").toLowerCase().includes("fourn"))
 
@@ -203,3 +246,4 @@ mFilter.onchange=render
 </script>
 </body>
 </html>
+
