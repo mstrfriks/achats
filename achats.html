@@ -2,43 +2,34 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<title>Suivi des achats</title>
+<title>Suivi achats</title>
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5"></script>
 
 <style>
-body{
- font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial;
- background:#f5f5f7;
- margin:40px;
- color:#1d1d1f;
-}
-.card{
- background:white;
- border-radius:18px;
- padding:20px;
- margin-bottom:20px;
- box-shadow:0 4px 20px rgba(0,0,0,0.06);
-}
-select{padding:10px;border-radius:12px;border:1px solid #ddd}
-table{width:100%;border-collapse:collapse;background:white;border-radius:18px;overflow:hidden}
-th,td{padding:12px;border-bottom:1px solid #eee}
-th{cursor:pointer;background:#fafafa}
-.kpi{font-size:22px;font-weight:600}
+body{font-family:-apple-system,Segoe UI,Arial;background:#f5f5f7;margin:40px}
+.card{background:white;border-radius:16px;padding:20px;margin-bottom:20px;box-shadow:0 4px 16px rgba(0,0,0,.06)}
+select{padding:10px;border-radius:10px;border:1px solid #ddd}
+table{width:100%;border-collapse:collapse}
+th,td{padding:10px;border-bottom:1px solid #eee}
+th{background:#fafafa;cursor:pointer}
+#debug{font-family:monospace;font-size:12px;color:#666}
 </style>
 </head>
 
 <body>
 
-<h1>📊 Suivi des achats</h1>
+<h2>📊 Suivi des achats</h2>
 
 <div class="card">
 <select id="fFilter"><option value="">Tous fournisseurs</option></select>
-<select id="tFilter"><option value="">Tous types doc</option></select>
+<select id="tFilter"><option value="">Tous types</option></select>
 </div>
 
-<div class="card kpi">
-Total HT filtré : <span id="total">0 €</span>
+<div class="card">
+Total HT : <b id="total">0 €</b>
 </div>
+
+<div id="debug" class="card">debug: démarrage…</div>
 
 <table>
 <thead>
@@ -58,42 +49,41 @@ Total HT filtré : <span id="total">0 €</span>
 
 const URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS80EbOdyJxdT8hmQAux0KJXM-LHsGKFP5eEGQuo28JFid6CwEVCApcOJ-0GpncdDul4Q97VvmjdmTm/pub?output=csv";
 
+function log(x){ debug.innerText += "\n"+x }
+
 function eur(v){
- return parseFloat((v||"").replace(/[€\s]/g,"").replace(",", ".")) || 0;
+ return parseFloat((v||"").replace(/[€\s]/g,"").replace(",", "."))||0
 }
 
-function norm(s){
- return (s||"").trim().toLowerCase();
-}
+function norm(s){ return (s||"").trim().toLowerCase() }
 
-let rows=[];
-let sortCol=1;
-let sortDir=-1;
+let DATA=[]
+let sortCol=1, sortDir=-1
 
 function render(){
+ const f=norm(fFilter.value)
+ const t=norm(tFilter.value)
 
- const f = norm(fFilter.value);
- const t = norm(tFilter.value);
+ const rows = DATA.filter(r =>
+   (!f || norm(r.f)===f) &&
+   (!t || norm(r.t)===t)
+ )
 
- const out = rows.filter(r =>
-   (!f || norm(r[0])===f) &&
-   (!t || norm(r[4])===t)
- );
+ rows.sort((a,b)=>{
+   const A=a.arr[sortCol], B=b.arr[sortCol]
+   if(sortCol===3) return (eur(A)-eur(B))*sortDir
+   return A.localeCompare(B)*sortDir
+ })
 
- out.sort((a,b)=>{
-   if(sortCol===3) return (eur(a[3])-eur(b[3]))*sortDir;
-   return a[sortCol].localeCompare(b[sortCol])*sortDir;
- });
+ tbody.innerHTML=""
+ let total=0
 
- tbody.innerHTML="";
- let total=0;
+ rows.forEach(r=>{
+   total+=eur(r.arr[3])
+   tbody.innerHTML += "<tr>"+r.arr.map(x=>`<td>${x}</td>`).join("")+"</tr>"
+ })
 
- out.forEach(r=>{
-   total+=eur(r[3]);
-   tbody.innerHTML += `<tr>${r.map(c=>`<td>${c}</td>`).join("")}</tr>`;
- });
-
- totalEl.textContent = total.toLocaleString()+" €";
+ totalEl.innerText = total.toLocaleString()+" €"
 }
 
 Papa.parse(URL,{
@@ -101,50 +91,70 @@ Papa.parse(URL,{
  skipEmptyLines:true,
  complete: res => {
 
-   const data = res.data;
+   log("lignes csv: "+res.data.length)
 
-   // 🔎 détecte ligne d’en-tête
-   const headerIndex = data.findIndex(r =>
+   // 🔎 trouve header
+   const headerRow = res.data.find(r =>
      r.join(" ").toLowerCase().includes("date") &&
      r.join(" ").toLowerCase().includes("fourn")
-   );
+   )
 
-   const body = data.slice(headerIndex+1);
+   if(!headerRow){ log("HEADER NON TROUVÉ"); return }
 
-   const fset=new Set();
-   const tset=new Set();
+   log("header détecté: "+headerRow.join(" | "))
 
-   body.forEach(r=>{
-     if(!r[0]) return;
+   const idx = {
+     fournisseur: headerRow.findIndex(c=>/fourn/i.test(c)),
+     date: headerRow.findIndex(c=>/date/i.test(c)),
+     comm: headerRow.findIndex(c=>/comment/i.test(c)),
+     ht: headerRow.findIndex(c=>/charge|€|ht/i.test(c)),
+     type: headerRow.findIndex(c=>/type/i.test(c)),
+     ref: headerRow.findIndex(c=>/réf|ref/i.test(c))
+   }
 
-     const row=[r[0],r[1],r[2],r[3],r[6],r[7]];
-     rows.push(row);
-     fset.add(r[0]);
-     tset.add(r[6]);
-   });
+   log("index colonnes: "+JSON.stringify(idx))
 
-   [...fset].sort().forEach(v=>fFilter.innerHTML+=`<option>${v}</option>`);
-   [...tset].sort().forEach(v=>tFilter.innerHTML+=`<option>${v}</option>`);
+   const start = res.data.indexOf(headerRow)+1
 
-   render();
+   const fset=new Set()
+   const tset=new Set()
+
+   res.data.slice(start).forEach(r=>{
+     if(!r[idx.fournisseur]) return
+
+     const row = {
+       f:r[idx.fournisseur],
+       t:r[idx.type],
+       arr:[
+         r[idx.fournisseur],
+         r[idx.date],
+         r[idx.comm],
+         r[idx.ht],
+         r[idx.type],
+         r[idx.ref]
+       ]
+     }
+
+     DATA.push(row)
+     fset.add(row.f)
+     tset.add(row.t)
+   })
+
+   log("lignes utiles: "+DATA.length)
+
+   fset.forEach(v=>fFilter.innerHTML+=`<option>${v}</option>`)
+   tset.forEach(v=>tFilter.innerHTML+=`<option>${v}</option>`)
+
+   render()
  }
-});
+})
 
-fFilter.onchange=render;
-tFilter.onchange=render;
+fFilter.onchange=render
+tFilter.onchange=render
 
 document.querySelectorAll("th").forEach(th=>{
- th.onclick=()=>{
-   sortCol=+th.dataset.col;
-   sortDir*=-1;
-   render();
- };
-});
-
-const fFilter=document.getElementById("fFilter");
-const tFilter=document.getElementById("tFilter");
-const tbody=document.getElementById("tbody");
-const totalEl=document.getElementById("total");
+ th.onclick=()=>{ sortCol=+th.dataset.col; sortDir*=-1; render() }
+})
 
 </script>
 
