@@ -1,76 +1,46 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Test CSV</title>
+</head>
+<body>
+
+<h2>Test chargement Google Sheet CSV</h2>
+
+<table border="1" id="t"></table>
+
 <script>
+const url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS80EbOdyJxdT8hmQAux0KJXM-LHsGKFP5eEGQuo28JFid6CwEVCApcOJ-0GpncdDul4Q97VvmjdmTm/pub?output=csv";
 
-const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS80EbOdyJxdT8hmQAux0KJXM-LHsGKFP5eEGQuo28JFid6CwEVCApcOJ-0GpncdDul4Q97VvmjdmTm/pub?output=csv";
+fetch(url)
+.then(r => r.text())
+.then(txt => {
 
-let table;
+  console.log("CSV reçu:", txt.slice(0,200));
 
-function toNumber(v){
- if(!v) return 0;
- return parseFloat(v.replace(",",".").replace(" ","")) || 0;
-}
+  const rows = txt.split(/\r?\n/).map(r =>
+    r.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g)
+  );
 
-Papa.parse(csvUrl, {
- download: true,
- skipEmptyLines: true,
+  const table = document.getElementById("t");
 
- complete: function(results){
+  rows.slice(0,50).forEach(row => {
+    if(!row) return;
+    const tr = document.createElement("tr");
+    row.forEach(c => {
+      const td = document.createElement("td");
+      td.textContent = c.replace(/^"|"$/g,"");
+      tr.appendChild(td);
+    });
+    table.appendChild(tr);
+  });
 
-   const rows = results.data;
-   rows.shift(); // enlève header
-
-   const fournisseurs = new Set();
-   const refs = new Set();
-
-   rows.forEach(r => {
-
-     const date = r[0];
-     const fournisseur = r[1];
-     const type = r[3];
-     const ref = r[5];
-     const ht = r[4];
-
-     fournisseurs.add(fournisseur);
-     refs.add(ref);
-
-     $("#table tbody").append(`
-       <tr>
-         <td>${date}</td>
-         <td>${fournisseur}</td>
-         <td>${type}</td>
-         <td>${ref}</td>
-         <td>${ht}</td>
-       </tr>
-     `);
-   });
-
-   fournisseurs.forEach(f => $("#fournisseurFilter").append(`<option>${f}</option>`));
-   refs.forEach(r => $("#refFilter").append(`<option>${r}</option>`));
-
-   table = $('#table').DataTable({
-     pageLength: 25,
-     order:[[0,"desc"]]
-   });
-
-   updateTotal();
- }
+})
+.catch(e => {
+  document.body.innerHTML += "<p>ERREUR FETCH: "+e+"</p>";
 });
-
-function updateTotal(){
- let sum = 0;
- table.rows({search:'applied'}).every(function(){
-   sum += toNumber(this.data()[4]);
- });
- $("#total").text(sum.toLocaleString()+" €");
-}
-
-$("#fournisseurFilter").on("change", function(){
- table.column(1).search(this.value).draw();
-});
-
-$("#refFilter").on("change", function(){
- table.column(3).search(this.value).draw();
-});
-
-$('#table').on('draw.dt', updateTotal);
-
 </script>
+
+</body>
+</html>
