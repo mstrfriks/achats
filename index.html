@@ -21,11 +21,31 @@ body{
  margin-bottom:20px;
  box-shadow:0 4px 20px rgba(0,0,0,.06);
 }
-select{padding:10px;border-radius:12px;border:1px solid #ddd;margin-right:10px}
-table{width:100%;border-collapse:collapse}
-th,td{padding:10px;border-bottom:1px solid #eee}
-th{cursor:pointer;background:#fafafa}
-.kpi{font-size:22px;font-weight:600}
+select{
+ padding:10px;
+ border-radius:12px;
+ border:1px solid #ddd;
+ margin-right:10px;
+}
+table{
+ width:100%;
+ border-collapse:collapse;
+ background:white;
+ border-radius:18px;
+ overflow:hidden;
+}
+th,td{
+ padding:10px;
+ border-bottom:1px solid #eee;
+}
+th{
+ cursor:pointer;
+ background:#fafafa;
+}
+.kpi{
+ font-size:22px;
+ font-weight:600;
+}
 </style>
 </head>
 
@@ -64,86 +84,101 @@ Total HT filtré : <span id="total">0 €</span>
 <script>
 
 function eur(v){
- return parseFloat(v.replace(/[^\d,.-]/g,"").replace(",", ".")) || 0
-}
-function norm(s){ return (s||"").trim().toLowerCase() }
-function monthKey(d){
- const [j,m,a]=d.split("/")
- return a+"-"+m
+ return parseFloat((v||"").replace(/[^\d,.-]/g,"").replace(",", ".")) || 0;
 }
 
-let DATA=[]
-let sortCol=1, sortDir=-1
-let chart
+function norm(s){
+ return (s||"").trim().toLowerCase();
+}
+
+function monthKey(d){
+ if(!d || !d.includes("/")) return "";
+ const [j,m,a]=d.split("/");
+ return a+"-"+m;
+}
+
+let DATA=[];
+let sortCol=1;
+let sortDir=-1;
+let chart;
 
 function render(){
 
- const f=norm(fFilter.value)
- const r=norm(rFilter.value)
- const m=mFilter.value
+ const f = norm(fFilter.value);
+ const r = norm(rFilter.value);
+ const m = mFilter.value;
 
  const rows = DATA.filter(x =>
    (!f || norm(x.f)===f) &&
    (!r || norm(x.ref)===r) &&
    (!m || x.month===m)
- )
+ );
 
  rows.sort((a,b)=>{
-   if(sortCol===3) return (eur(a.arr[3])-eur(b.arr[3]))*sortDir
-   return a.arr[sortCol].localeCompare(b.arr[sortCol])*sortDir
- })
+   if(sortCol===3) return (eur(a.arr[3])-eur(b.arr[3]))*sortDir;
+   return (a.arr[sortCol]||"").localeCompare(b.arr[sortCol]||"")*sortDir;
+ });
 
- tbody.innerHTML=""
- let total=0
+ tbody.innerHTML="";
+ let total=0;
 
  rows.forEach(x=>{
-   total+=eur(x.arr[3])
-   tbody.innerHTML += "<tr>"+x.arr.map(c=>`<td>${c}</td>`).join("")+"</tr>"
- })
+   total += eur(x.arr[3]);
+   tbody.innerHTML += "<tr>"+x.arr.map(c=>`<td>${c||""}</td>`).join("")+"</tr>";
+ });
 
- totalEl.textContent = total.toLocaleString()+" €"
- buildChart(rows)
+ totalEl.textContent = total.toLocaleString()+" €";
+ buildChart(rows);
 }
 
 function buildChart(rows){
 
- const map={}
- rows.forEach(r=>{
-   if(!map[r.month]) map[r.month]={}
-   map[r.month][r.ref]=(map[r.month][r.ref]||0)+eur(r.arr[3])
- })
+ const map={};
 
- const months=Object.keys(map).sort()
- const refs=[...new Set(rows.map(r=>r.ref))]
+ rows.forEach(r=>{
+   if(!r.month) return;
+   if(!map[r.month]) map[r.month]={};
+   map[r.month][r.ref] = (map[r.month][r.ref]||0) + eur(r.arr[3]);
+ });
+
+ const months = Object.keys(map).sort();
+ const refs = [...new Set(rows.map(r=>r.ref).filter(Boolean))];
 
  const datasets = refs.map(ref=>({
-   label:ref,
-   data:months.map(m=>map[m][ref]||0)
- }))
+   label: ref,
+   data: months.map(m => map[m][ref] || 0)
+ }));
 
- if(chart) chart.destroy()
+ if(chart) chart.destroy();
 
- chart=new Chart(chartEl,{
+ chart = new Chart(chartEl,{
    type:"bar",
-   data:{labels:months,datasets},
-   options:{scales:{x:{stacked:true},y:{stacked:true}}}
- })
+   data:{ labels:months, datasets },
+   options:{
+     responsive:true,
+     plugins:{ legend:{ position:"bottom" }},
+     scales:{ x:{ stacked:true }, y:{ stacked:true }}
+   }
+ });
 }
 
 fetch("data.csv")
 .then(r=>r.text())
 .then(csv => {
 
-Papa.parse(csv,{
+ Papa.parse(csv,{
   skipEmptyLines:true,
-  delimiter: ";",
+  delimiter:";",
   complete: res => {
 
     const rows = res.data.slice(2); // saute titre + header
 
-    const fset=new Set(), rset=new Set(), mset=new Set();
+    const fset=new Set();
+    const rset=new Set();
+    const mset=new Set();
 
     rows.forEach(row=>{
+
       if(!row[0]) return;
 
       const d = row[1];
@@ -165,87 +200,40 @@ Papa.parse(csv,{
 
       DATA.push(obj);
       fset.add(obj.f);
-      rset.add(obj.ref);
-      mset.add(m);
+      if(obj.ref) rset.add(obj.ref);
+      if(m) mset.add(m);
     });
 
-    fset.forEach(v=>fFilter.innerHTML+=`<option>${v}</option>`);
-    rset.forEach(v=>rFilter.innerHTML+=`<option>${v}</option>`);
-    mset.forEach(v=>mFilter.innerHTML+=`<option>${v}</option>`);
+    [...fset].sort().forEach(v=>fFilter.innerHTML+=`<option>${v}</option>`);
+    [...rset].sort().forEach(v=>rFilter.innerHTML+=`<option>${v}</option>`);
+    [...mset].sort().forEach(v=>mFilter.innerHTML+=`<option>${v}</option>`);
 
     render();
   }
- })
+ });
 
-})
-
-
-   const header=res.data.find(r=>r.join(" ").toLowerCase().includes("fourn"))
-
-   const idx={
-     f: header.findIndex(c=>/fourn/i.test(c)),
-     d: header.findIndex(c=>/date/i.test(c)),
-     c: header.findIndex(c=>/comment/i.test(c)),
-     h: header.findIndex(c=>/charge|ht/i.test(c)),
-     t: header.findIndex(c=>/type/i.test(c)),
-     r: header.findIndex(c=>/réf|ref/i.test(c))
-   }
-
-   const body=res.data.slice(res.data.indexOf(header)+1)
-
-   const fset=new Set(), rset=new Set(), mset=new Set()
-
-   body.forEach(row=>{
-     if(!row[idx.f]) return
-
-     const d=row[idx.d]
-     const m=monthKey(d)
-
-     const obj={
-       f:row[idx.f],
-       ref:row[idx.r],
-       month:m,
-       arr:[
-         row[idx.f],
-         d,
-         row[idx.c],
-         row[idx.h],
-         row[idx.t],
-         row[idx.r]
-       ]
-     }
-
-     DATA.push(obj)
-     fset.add(obj.f)
-     rset.add(obj.ref)
-     mset.add(m)
-   })
-
-   fset.forEach(v=>fFilter.innerHTML+=`<option>${v}</option>`)
-   rset.forEach(v=>rFilter.innerHTML+=`<option>${v}</option>`)
-   mset.forEach(v=>mFilter.innerHTML+=`<option>${v}</option>`)
-
-   render()
- }
-}))
+});
 
 document.querySelectorAll("th").forEach(th=>{
- th.onclick=()=>{sortCol=+th.dataset.col;sortDir*=-1;render()}
-})
+ th.onclick=()=>{
+   sortCol=+th.dataset.col;
+   sortDir*=-1;
+   render();
+ };
+});
 
-const tbody=document.getElementById("tbody")
-const totalEl=document.getElementById("total")
-const chartEl=document.getElementById("chart")
-const fFilter=document.getElementById("fFilter")
-const rFilter=document.getElementById("rFilter")
-const mFilter=document.getElementById("mFilter")
+const tbody=document.getElementById("tbody");
+const totalEl=document.getElementById("total");
+const chartEl=document.getElementById("chart");
+const fFilter=document.getElementById("fFilter");
+const rFilter=document.getElementById("rFilter");
+const mFilter=document.getElementById("mFilter");
 
-fFilter.onchange=render
-rFilter.onchange=render
-mFilter.onchange=render
+fFilter.onchange=render;
+rFilter.onchange=render;
+mFilter.onchange=render;
 
 </script>
+
 </body>
 </html>
-
-
