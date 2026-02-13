@@ -1,31 +1,90 @@
 <!doctype html>
-<html>
+<html lang="fr">
 <head>
 <meta charset="utf-8">
-<title>Suivi achats</title>
+<title>Suivi des achats</title>
 
-<link rel="stylesheet"
- href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
-
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 
 <style>
-body { font-family: Arial; margin:20px }
-select { margin-right:10px; padding:5px }
-.kpi { font-size:18px; font-weight:bold; margin:10px 0 }
+
+body{
+ font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",Arial;
+ background:#f5f5f7;
+ margin:40px;
+ color:#1d1d1f;
+}
+
+h1{
+ font-weight:600;
+ font-size:28px;
+ margin-bottom:20px;
+}
+
+.card{
+ background:white;
+ border-radius:18px;
+ padding:20px;
+ box-shadow:0 4px 20px rgba(0,0,0,0.06);
+ margin-bottom:20px;
+}
+
+.filters{
+ display:flex;
+ gap:12px;
+}
+
+select{
+ padding:10px 14px;
+ border-radius:12px;
+ border:1px solid #ddd;
+ background:white;
+ font-size:14px;
+}
+
+.kpi{
+ font-size:22px;
+ font-weight:600;
+}
+
+table.dataTable{
+ border:none !important;
+}
+
+.dataTables_wrapper{
+ background:white;
+ border-radius:18px;
+ padding:20px;
+ box-shadow:0 4px 20px rgba(0,0,0,0.06);
+}
+
 </style>
 </head>
 
 <body>
 
-<h2>📊 Suivi des achats</h2>
+<h1>📊 Suivi des achats</h1>
 
-<select id="fournisseurFilter"><option value="">Tous fournisseurs</option></select>
-<select id="typeFilter"><option value="">Tous types doc</option></select>
+<div class="card">
+<div class="filters">
+<select id="fournisseurFilter">
+<option value="">Tous fournisseurs</option>
+</select>
 
-<div class="kpi">Total HT filtré : <span id="total">0 €</span></div>
+<select id="typeFilter">
+<option value="">Tous types doc</option>
+</select>
+</div>
+</div>
+
+<div class="card">
+<div class="kpi">
+Total HT filtré : <span id="total">0 €</span>
+</div>
+</div>
 
 <table id="t" class="display">
 <thead>
@@ -50,48 +109,46 @@ function eur(v){
  return parseFloat(v.replace(/[€\s]/g,"").replace(",", ".")) || 0;
 }
 
-Papa.parse(url, {
+function escapeRegex(text){
+ return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+Papa.parse(url,{
  download:true,
  skipEmptyLines:true,
 
  complete: res => {
 
-   const rows = res.data.slice(2); // saute titre + header
+   const rows = res.data.slice(2);
 
-   const fset = new Set();
-   const tset = new Set();
+   const fset=new Set();
+   const tset=new Set();
 
-   rows.forEach(r => {
+   rows.forEach(r=>{
 
-     const fournisseur = r[0];
-     const date = r[1];
-     const comm = r[2];
-     const ht = r[3];
-     const type = r[6];
-     const ref = r[7];
-
-     if(!fournisseur) return;
-
-     fset.add(fournisseur);
-     tset.add(type);
+     if(!r[0]) return;
 
      $("#t tbody").append(`
      <tr>
-       <td>${fournisseur}</td>
-       <td>${date}</td>
-       <td>${comm}</td>
-       <td>${ht}</td>
-       <td>${type}</td>
-       <td>${ref}</td>
+       <td>${r[0]}</td>
+       <td>${r[1]}</td>
+       <td>${r[2]}</td>
+       <td>${r[3]}</td>
+       <td>${r[6]}</td>
+       <td>${r[7]}</td>
      </tr>`);
+
+     fset.add(r[0]);
+     tset.add(r[6]);
    });
 
-   fset.forEach(v => $("#fournisseurFilter").append(`<option>${v}</option>`));
-   tset.forEach(v => $("#typeFilter").append(`<option>${v}</option>`));
+   [...fset].sort().forEach(v=>$("#fournisseurFilter").append(`<option>${v}</option>`));
+   [...tset].sort().forEach(v=>$("#typeFilter").append(`<option>${v}</option>`));
 
    window.dt = $('#t').DataTable({
      pageLength:25,
-     order:[[1,"desc"]]
+     order:[[1,"desc"]],
+     language:{ search:"Recherche :" }
    });
 
    updateTotal();
@@ -99,19 +156,21 @@ Papa.parse(url, {
 });
 
 function updateTotal(){
- let s = 0;
+ let s=0;
  dt.rows({search:'applied'}).every(function(){
-   s += eur(this.data()[3]);
+   s+=eur(this.data()[3]);
  });
  $("#total").text(s.toLocaleString()+" €");
 }
 
 $("#fournisseurFilter").on("change", function(){
- dt.column(0).search(this.value).draw();
+ const v=this.value;
+ dt.column(0).search(v ? "^"+escapeRegex(v)+"$" : "", true,false).draw();
 });
 
 $("#typeFilter").on("change", function(){
- dt.column(4).search(this.value).draw();
+ const v=this.value;
+ dt.column(4).search(v ? "^"+escapeRegex(v)+"$" : "", true,false).draw();
 });
 
 $('#t').on('draw.dt', updateTotal);
