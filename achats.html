@@ -3,64 +3,46 @@
 <head>
 <meta charset="utf-8">
 <title>Suivi des achats</title>
-
-<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 
 <style>
-
 body{
- font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",Arial;
+ font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial;
  background:#f5f5f7;
  margin:40px;
  color:#1d1d1f;
-}
-
-h1{
- font-weight:600;
- font-size:28px;
- margin-bottom:20px;
 }
 
 .card{
  background:white;
  border-radius:18px;
  padding:20px;
- box-shadow:0 4px 20px rgba(0,0,0,0.06);
  margin-bottom:20px;
-}
-
-.filters{
- display:flex;
- gap:12px;
+ box-shadow:0 4px 20px rgba(0,0,0,0.06);
 }
 
 select{
  padding:10px 14px;
  border-radius:12px;
  border:1px solid #ddd;
- background:white;
- font-size:14px;
 }
 
-.kpi{
- font-size:22px;
- font-weight:600;
-}
-
-table.dataTable{
- border:none !important;
-}
-
-.dataTables_wrapper{
+table{
+ width:100%;
+ border-collapse:collapse;
  background:white;
  border-radius:18px;
- padding:20px;
- box-shadow:0 4px 20px rgba(0,0,0,0.06);
+ overflow:hidden;
 }
 
+th,td{
+ padding:12px;
+ border-bottom:1px solid #eee;
+}
+
+th{cursor:pointer;background:#fafafa}
+
+.kpi{font-size:22px;font-weight:600}
 </style>
 </head>
 
@@ -69,32 +51,23 @@ table.dataTable{
 <h1>📊 Suivi des achats</h1>
 
 <div class="card">
-<div class="filters">
-<select id="fournisseurFilter">
-<option value="">Tous fournisseurs</option>
-</select>
-
-<select id="typeFilter">
-<option value="">Tous types doc</option>
-</select>
-</div>
+<select id="fFilter"><option value="">Tous fournisseurs</option></select>
+<select id="tFilter"><option value="">Tous types doc</option></select>
 </div>
 
-<div class="card">
-<div class="kpi">
+<div class="card kpi">
 Total HT filtré : <span id="total">0 €</span>
 </div>
-</div>
 
-<table id="t" class="display">
+<table id="tbl">
 <thead>
 <tr>
-<th>Fournisseur</th>
-<th>Date</th>
-<th>Commentaire</th>
-<th>€ HT</th>
-<th>Type doc</th>
-<th>Réf gestion</th>
+<th data-col="0">Fournisseur</th>
+<th data-col="1">Date</th>
+<th data-col="2">Commentaire</th>
+<th data-col="3">€ HT</th>
+<th data-col="4">Type doc</th>
+<th data-col="5">Réf gestion</th>
 </tr>
 </thead>
 <tbody></tbody>
@@ -104,76 +77,98 @@ Total HT filtré : <span id="total">0 €</span>
 
 const url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS80EbOdyJxdT8hmQAux0KJXM-LHsGKFP5eEGQuo28JFid6CwEVCApcOJ-0GpncdDul4Q97VvmjdmTm/pub?output=csv";
 
-function eur(v){
- if(!v) return 0;
- return parseFloat(v.replace(/[€\s]/g,"").replace(",", ".")) || 0;
+function norm(s){
+ return (s||"")
+  .trim()
+  .toLowerCase()
+  .normalize("NFD")
+  .replace(/\p{Diacritic}/gu,"");
 }
 
-function escapeRegex(text){
- return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+function eur(v){
+ return parseFloat((v||"").replace(/[€\s]/g,"").replace(",", ".")) || 0;
+}
+
+let rows=[];
+let sortCol=1;
+let sortDir=-1;
+
+function render(){
+
+ const f = norm(fFilter.value);
+ const t = norm(tFilter.value);
+
+ let out = rows.filter(r =>
+   (!f || r.fKey===f) &&
+   (!t || r.tKey===t)
+ );
+
+ out.sort((a,b)=>{
+   if(sortCol===3) return (eur(a.val[3])-eur(b.val[3]))*sortDir;
+   return a.val[sortCol].localeCompare(b.val[sortCol])*sortDir;
+ });
+
+ let total=0;
+ tbody.innerHTML="";
+
+ out.forEach(r=>{
+   total+=eur(r.val[3]);
+   tbody.innerHTML += `<tr>${r.val.map(c=>`<td>${c}</td>`).join("")}</tr>`;
+ });
+
+ totalEl.textContent = total.toLocaleString()+" €";
 }
 
 Papa.parse(url,{
  download:true,
  skipEmptyLines:true,
-
  complete: res => {
 
-   const rows = res.data.slice(2);
+   const raw = res.data.slice(2);
 
-   const fset=new Set();
-   const tset=new Set();
+   const fset=new Map();
+   const tset=new Map();
 
-   rows.forEach(r=>{
-
+   raw.forEach(r=>{
      if(!r[0]) return;
 
-     $("#t tbody").append(`
-     <tr>
-       <td>${r[0]}</td>
-       <td>${r[1]}</td>
-       <td>${r[2]}</td>
-       <td>${r[3]}</td>
-       <td>${r[6]}</td>
-       <td>${r[7]}</td>
-     </tr>`);
+     const obj={
+       val:[r[0].trim(),r[1],r[2],r[3],r[6],r[7]],
+       fKey:norm(r[0]),
+       tKey:norm(r[6])
+     };
 
-     fset.add(r[0]);
-     tset.add(r[6]);
+     rows.push(obj);
+
+     fset.set(obj.fKey,r[0].trim());
+     tset.set(obj.tKey,r[6].trim());
    });
 
-   [...fset].sort().forEach(v=>$("#fournisseurFilter").append(`<option>${v}</option>`));
-   [...tset].sort().forEach(v=>$("#typeFilter").append(`<option>${v}</option>`));
+   [...fset.entries()].sort().forEach(([k,v]) =>
+     fFilter.innerHTML+=`<option value="${v}">${v}</option>`);
 
-   window.dt = $('#t').DataTable({
-     pageLength:25,
-     order:[[1,"desc"]],
-     language:{ search:"Recherche :" }
-   });
+   [...tset.entries()].sort().forEach(([k,v]) =>
+     tFilter.innerHTML+=`<option value="${v}">${v}</option>`);
 
-   updateTotal();
+   render();
  }
 });
 
-function updateTotal(){
- let s=0;
- dt.rows({search:'applied'}).every(function(){
-   s+=eur(this.data()[3]);
- });
- $("#total").text(s.toLocaleString()+" €");
-}
+fFilter.onchange=render;
+tFilter.onchange=render;
 
-$("#fournisseurFilter").on("change", function(){
- const v=this.value;
- dt.column(0).search(v ? "^"+escapeRegex(v)+"$" : "", true,false).draw();
+document.querySelectorAll("th").forEach(th=>{
+ th.onclick=()=>{
+   sortCol=+th.dataset.col;
+   sortDir*=-1;
+   render();
+ };
 });
 
-$("#typeFilter").on("change", function(){
- const v=this.value;
- dt.column(4).search(v ? "^"+escapeRegex(v)+"$" : "", true,false).draw();
-});
-
-$('#t').on('draw.dt', updateTotal);
+const fFilter=document.getElementById("fFilter");
+const tFilter=document.getElementById("tFilter");
+const tbody=document.querySelector("#tbl tbody");
+const totalEl=document.getElementById("total");
 
 </script>
 
