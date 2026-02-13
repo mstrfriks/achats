@@ -91,6 +91,12 @@ function norm(s){
  return (s||"").trim().toLowerCase();
 }
 
+function dateValue(d){
+ if(!d || !d.includes("/")) return 0;
+ const [j,m,a]=d.split("/");
+ return new Date(a, m-1, j).getTime();
+}
+
 function monthKey(d){
  if(!d || !d.includes("/")) return null;
  const [j,m,a]=d.split("/");
@@ -122,8 +128,17 @@ function render(){
  );
 
  rows.sort((a,b)=>{
-   if(sortCol===3) return (eur(a.arr[3])-eur(b.arr[3]))*sortDir;
-   return (a.arr[sortCol]||"").localeCompare(b.arr[sortCol]||"")*sortDir;
+
+   if(sortCol===3){
+     return (eur(a.arr[3]) - eur(b.arr[3])) * sortDir;
+   }
+
+   if(sortCol===1){
+     return (dateValue(a.arr[1]) - dateValue(b.arr[1])) * sortDir;
+   }
+
+   return (a.arr[sortCol]||"")
+     .localeCompare(b.arr[sortCol]||"", "fr", {sensitivity:"base"}) * sortDir;
  });
 
  tbody.innerHTML="";
@@ -212,7 +227,7 @@ fetch("data.csv")
 
     [...fset].sort().forEach(v=>fFilter.innerHTML+=`<option>${v}</option>`);
     [...rset].sort().forEach(v=>rFilter.innerHTML+=`<option>${v}</option>`);
-    [...mset].sort().forEach(v=>mFilter.innerHTML+=`<option>${monthLabel(v)}</option>`);
+    [...mset].sort().forEach(v=>mFilter.innerHTML+=`<option value="${v}">${monthLabel(v)}</option>`);
 
     render();
   }
