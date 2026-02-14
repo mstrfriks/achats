@@ -21,10 +21,11 @@ body{
  margin-bottom:20px;
  box-shadow:0 4px 20px rgba(0,0,0,.06);
 }
-input,select,button{
+input,button{
  padding:8px;
  border-radius:10px;
  border:1px solid #ddd;
+ margin:4px;
 }
 button{
  cursor:pointer;
@@ -45,7 +46,7 @@ th,td{
 }
 th{background:#fafafa;cursor:pointer}
 .kpi{font-size:22px;font-weight:600}
-.action-btn{margin-right:6px;font-size:12px}
+.action-btn{font-size:12px;margin-right:6px}
 </style>
 </head>
 
@@ -53,8 +54,20 @@ th{background:#fafafa;cursor:pointer}
 
 <h2>📊 Suivi des achats</h2>
 
+<!-- ➕ AJOUT -->
+<div class="card">
+<b>Ajouter une ligne</b><br>
+<input id="addF" placeholder="Fournisseur">
+<input id="addDate" placeholder="Date jj/mm/aaaa">
+<input id="addCom" placeholder="Commentaire">
+<input id="addHt" placeholder="Montant €">
+<input id="addType" placeholder="Type doc">
+<input id="addRef" placeholder="Réf gestion">
+<button onclick="addRow()">Ajouter</button>
+</div>
+
 <div class="card kpi">
-Total HT filtré : <span id="total">0 €</span>
+Total HT : <span id="total">0 €</span>
 </div>
 
 <div class="card">
@@ -111,6 +124,31 @@ let sortCol=1;
 let sortDir=-1;
 let chart;
 
+function addRow(){
+
+ const f=addF.value.trim();
+ const d=addDate.value.trim();
+ const c=addCom.value.trim();
+ const ht=addHt.value.trim();
+ const t=addType.value.trim();
+ const r=cleanRef(addRef.value);
+
+ if(!f || !d || !ht){
+   alert("Fournisseur, date et montant requis");
+   return;
+ }
+
+ DATA.push({
+   f,
+   ref:r,
+   month:monthKey(d),
+   arr:[f,d,c,ht,t,r]
+ });
+
+ addF.value=addDate.value=addCom.value=addHt.value=addType.value=addRef.value="";
+ render();
+}
+
 function render(){
 
  const rows=[...DATA];
@@ -147,24 +185,20 @@ function render(){
 }
 
 function editRow(i){
-
  const r=DATA[i].arr;
 
- tbody.children[i].innerHTML = `
+ tbody.children[i].innerHTML=`
 <td><input value="${r[0]}"></td>
 <td><input value="${r[1]}"></td>
 <td><input value="${r[2]}"></td>
 <td><input value="${r[3]}"></td>
 <td><input value="${r[4]}"></td>
 <td><input value="${r[5]}"></td>
-<td>
-<button onclick="saveRow(${i})">💾</button>
-</td>`;
+<td><button onclick="saveRow(${i})">💾</button></td>`;
 }
 
 function saveRow(i){
-
- const inputs = tbody.children[i].querySelectorAll("input");
+ const inputs=tbody.children[i].querySelectorAll("input");
  const arr=[...inputs].map(x=>x.value);
 
  DATA[i]={
@@ -178,6 +212,7 @@ function saveRow(i){
 }
 
 function deleteRow(i){
+ if(!confirm("Supprimer cette ligne ?")) return;
  DATA.splice(i,1);
  render();
 }
