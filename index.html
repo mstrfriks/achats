@@ -21,11 +21,16 @@ body{
  margin-bottom:20px;
  box-shadow:0 4px 20px rgba(0,0,0,.06);
 }
-select{
- padding:10px;
- border-radius:12px;
+input,select,button{
+ padding:8px;
+ border-radius:10px;
  border:1px solid #ddd;
- margin-right:10px;
+}
+button{
+ cursor:pointer;
+ background:#0071e3;
+ color:white;
+ border:none;
 }
 table{
  width:100%;
@@ -38,26 +43,15 @@ th,td{
  padding:10px;
  border-bottom:1px solid #eee;
 }
-th{
- cursor:pointer;
- background:#fafafa;
-}
-.kpi{
- font-size:22px;
- font-weight:600;
-}
+th{background:#fafafa;cursor:pointer}
+.kpi{font-size:22px;font-weight:600}
+.action-btn{margin-right:6px;font-size:12px}
 </style>
 </head>
 
 <body>
 
 <h2>📊 Suivi des achats</h2>
-
-<div class="card">
-<select id="fFilter"><option value="">Tous fournisseurs</option></select>
-<select id="rFilter"><option value="">Toutes références</option></select>
-<select id="mFilter"><option value="">Tous mois</option></select>
-</div>
 
 <div class="card kpi">
 Total HT filtré : <span id="total">0 €</span>
@@ -74,8 +68,9 @@ Total HT filtré : <span id="total">0 €</span>
 <th data-col="1">Date</th>
 <th data-col="2">Commentaire</th>
 <th data-col="3">€ HT</th>
-<th data-col="4">Type doc</th>
-<th data-col="5">Réf gestion</th>
+<th data-col="4">Type</th>
+<th data-col="5">Réf</th>
+<th>Actions</th>
 </tr>
 </thead>
 <tbody id="tbody"></tbody>
@@ -87,32 +82,28 @@ function eur(v){
  return parseFloat((v||"").replace(/[^\d,.-]/g,"").replace(",", ".")) || 0;
 }
 
-function norm(s){
- return (s||"").trim().toLowerCase();
-}
-
 function cleanRef(v){
- const r = (v||"").trim();
- return r ? r : "Sans référence";
+ v=(v||"").trim();
+ return v?v:"Sans référence";
 }
 
 function dateValue(d){
- if(!d || !d.includes("/")) return 0;
+ if(!d||!d.includes("/")) return 0;
  const [j,m,a]=d.split("/");
- return new Date(a, m-1, j).getTime();
+ return new Date(a,m-1,j).getTime();
 }
 
 function monthKey(d){
- if(!d || !d.includes("/")) return null;
+ if(!d||!d.includes("/")) return null;
  const [j,m,a]=d.split("/");
  return a+"-"+m;
 }
 
-function monthLabel(key){
- if(!key) return "";
- const [a,m]=key.split("-");
- const names=["jan","fév","mar","avr","mai","jun","jul","aoû","sep","oct","nov","déc"];
- return names[parseInt(m)-1]+" "+a;
+function monthLabel(k){
+ if(!k) return "";
+ const [a,m]=k.split("-");
+ const n=["jan","fév","mar","avr","mai","jun","jul","aoû","sep","oct","nov","déc"];
+ return n[m-1]+" "+a;
 }
 
 let DATA=[];
@@ -122,40 +113,73 @@ let chart;
 
 function render(){
 
- const f = norm(fFilter.value);
- const r = norm(rFilter.value);
- const m = mFilter.value;
-
- const rows = DATA.filter(x =>
-   (!f || norm(x.f)===f) &&
-   (!r || norm(x.ref)===r) &&
-   (!m || x.month===m)
- );
+ const rows=[...DATA];
 
  rows.sort((a,b)=>{
-
-   if(sortCol===3){
-     return (eur(a.arr[3]) - eur(b.arr[3])) * sortDir;
-   }
-
-   if(sortCol===1){
-     return (dateValue(a.arr[1]) - dateValue(b.arr[1])) * sortDir;
-   }
-
-   return (a.arr[sortCol]||"")
-     .localeCompare(b.arr[sortCol]||"", "fr", {sensitivity:"base"}) * sortDir;
+   if(sortCol===3) return (eur(a.arr[3])-eur(b.arr[3]))*sortDir;
+   if(sortCol===1) return (dateValue(a.arr[1])-dateValue(b.arr[1]))*sortDir;
+   return (a.arr[sortCol]||"").localeCompare(b.arr[sortCol]||"","fr")*sortDir;
  });
 
  tbody.innerHTML="";
  let total=0;
 
- rows.forEach(x=>{
-   total += eur(x.arr[3]);
-   tbody.innerHTML += "<tr>"+x.arr.map(c=>`<td>${c||""}</td>`).join("")+"</tr>";
+ rows.forEach((x,i)=>{
+   total+=eur(x.arr[3]);
+
+   tbody.innerHTML+=`
+   <tr>
+     <td>${x.arr[0]}</td>
+     <td>${x.arr[1]}</td>
+     <td>${x.arr[2]}</td>
+     <td>${x.arr[3]}</td>
+     <td>${x.arr[4]}</td>
+     <td>${x.arr[5]}</td>
+     <td>
+       <button class="action-btn" onclick="editRow(${i})">✏️</button>
+       <button class="action-btn" onclick="deleteRow(${i})">🗑</button>
+     </td>
+   </tr>`;
  });
 
  totalEl.textContent = total.toLocaleString()+" €";
  buildChart(rows);
+}
+
+function editRow(i){
+
+ const r=DATA[i].arr;
+
+ tbody.children[i].innerHTML = `
+<td><input value="${r[0]}"></td>
+<td><input value="${r[1]}"></td>
+<td><input value="${r[2]}"></td>
+<td><input value="${r[3]}"></td>
+<td><input value="${r[4]}"></td>
+<td><input value="${r[5]}"></td>
+<td>
+<button onclick="saveRow(${i})">💾</button>
+</td>`;
+}
+
+function saveRow(i){
+
+ const inputs = tbody.children[i].querySelectorAll("input");
+ const arr=[...inputs].map(x=>x.value);
+
+ DATA[i]={
+   f:arr[0],
+   ref:cleanRef(arr[5]),
+   month:monthKey(arr[1]),
+   arr:[arr[0],arr[1],arr[2],arr[3],arr[4],cleanRef(arr[5])]
+ };
+
+ render();
+}
+
+function deleteRow(i){
+ DATA.splice(i,1);
+ render();
 }
 
 function buildChart(rows){
@@ -168,97 +192,52 @@ function buildChart(rows){
    map[r.month][r.ref]=(map[r.month][r.ref]||0)+eur(r.arr[3]);
  });
 
- const months = Object.keys(map).sort();
- const labels = months.map(monthLabel);
- const refs = [...new Set(rows.map(r=>r.ref))];
+ const months=Object.keys(map).sort();
+ const labels=months.map(monthLabel);
+ const refs=[...new Set(rows.map(r=>r.ref))];
 
- const datasets = refs.map(ref=>({
-   label: ref,
-   data: months.map(m => map[m][ref] || 0)
+ const datasets=refs.map(ref=>({
+   label:ref,
+   data:months.map(m=>map[m][ref]||0)
  }));
 
  if(chart) chart.destroy();
 
- chart = new Chart(chartEl,{
+ chart=new Chart(chartEl,{
    type:"bar",
-   data:{ labels, datasets },
-   options:{
-     responsive:true,
-     plugins:{ legend:{ position:"bottom" }},
-     scales:{ x:{ stacked:true }, y:{ stacked:true }}
-   }
+   data:{labels,datasets},
+   options:{scales:{x:{stacked:true},y:{stacked:true}}}
  });
 }
 
 fetch("data.csv")
 .then(r=>r.text())
-.then(csv => {
+.then(csv=>Papa.parse(csv,{
+ skipEmptyLines:true,
+ complete: res => {
 
- Papa.parse(csv,{
-  skipEmptyLines:true,
-  complete: res => {
+   res.data.slice(2).forEach(row=>{
+     if(!row[0]) return;
 
-    const rows = res.data.slice(2);
+     DATA.push({
+       f:row[0],
+       ref:cleanRef(row[7]),
+       month:monthKey(row[1]),
+       arr:[row[0],row[1],row[2],row[3],row[6],cleanRef(row[7])]
+     });
+   });
 
-    const fset=new Set();
-    const rset=new Set();
-    const mset=new Set();
-
-    rows.forEach(row=>{
-      if(!row[0]) return;
-
-      const ref = cleanRef(row[7]);
-      const d=row[1];
-      const m=monthKey(d);
-
-      const obj={
-        f: row[0],
-        ref: ref,
-        month: m,
-        arr:[
-          row[0],
-          row[1],
-          row[2],
-          row[3],
-          row[6],
-          ref
-        ]
-      };
-
-      DATA.push(obj);
-      fset.add(obj.f);
-      rset.add(ref);
-      if(m) mset.add(m);
-    });
-
-    [...fset].sort().forEach(v=>fFilter.innerHTML+=`<option>${v}</option>`);
-    [...rset].sort().forEach(v=>rFilter.innerHTML+=`<option>${v}</option>`);
-    [...mset].sort().forEach(v=>mFilter.innerHTML+=`<option value="${v}">${monthLabel(v)}</option>`);
-
-    render();
-  }
- });
-
-});
+   render();
+ }
+}));
 
 document.querySelectorAll("th").forEach(th=>{
- th.onclick=()=>{
-   sortCol=+th.dataset.col;
-   sortDir*=-1;
-   render();
- };
+ th.onclick=()=>{sortCol=+th.dataset.col;sortDir*=-1;render();}
 });
 
 const tbody=document.getElementById("tbody");
 const totalEl=document.getElementById("total");
 const chartEl=document.getElementById("chart");
-const fFilter=document.getElementById("fFilter");
-const rFilter=document.getElementById("rFilter");
-const mFilter=document.getElementById("mFilter");
-
-fFilter.onchange=render;
-rFilter.onchange=render;
-mFilter.onchange=render;
 
 </script>
 
