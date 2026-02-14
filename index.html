@@ -9,14 +9,40 @@
 
 <style>
 body{font-family:-apple-system,Segoe UI,Arial;background:#f5f5f7;margin:40px}
-.tabs button{padding:10px 16px;border-radius:10px;border:1px solid #ddd;background:white;cursor:pointer;margin-right:8px}
+
+.tabs button{
+ padding:10px 16px;border-radius:10px;border:1px solid #ddd;
+ background:white;cursor:pointer;margin-right:8px
+}
 .tab{display:none}
 .tab.active{display:block}
-.card{background:white;border-radius:18px;padding:20px;margin-bottom:20px;box-shadow:0 4px 20px rgba(0,0,0,.06)}
-input,select,button{padding:8px;border-radius:10px;border:1px solid #ddd;margin:4px}
+
+.card{
+ background:white;border-radius:18px;padding:20px;margin-bottom:20px;
+ box-shadow:0 4px 20px rgba(0,0,0,.06)
+}
+
+input,select,button{
+ padding:8px;border-radius:10px;border:1px solid #ddd;margin:4px
+}
+
 table{width:100%;border-collapse:collapse;background:white}
 th,td{padding:10px;border-bottom:1px solid #eee}
 th{background:#fafafa}
+
+.filter-btn{
+ padding:6px 10px;
+ border:1px solid #ccc;
+ border-radius:8px;
+ background:white;
+ cursor:pointer;
+ margin:3px;
+}
+.filter-btn.active{
+ background:#0071e3;
+ color:white;
+ border-color:#0071e3;
+}
 </style>
 </head>
 
@@ -40,6 +66,13 @@ th{background:#fafafa}
 <input id="addType" placeholder="Type">
 <select id="addRefSelect"></select>
 <button onclick="addRow()">➕ Ajouter</button>
+</div>
+
+<div class="card">
+<b>Années</b><br>
+<div id="yearFilters"></div>
+<b>Mois</b><br>
+<div id="monthFilters"></div>
 </div>
 
 <div class="card">Total : <b id="total"></b></div>
@@ -69,9 +102,7 @@ th{background:#fafafa}
 
 <div class="card">
 <table>
-<thead>
-<tr><th>Code</th><th>Désignation</th><th></th></tr>
-</thead>
+<thead><tr><th>Code</th><th>Désignation</th><th></th></tr></thead>
 <tbody id="refBody"></tbody>
 </table>
 </div>
@@ -87,9 +118,9 @@ function showTab(id){
  document.getElementById(id).classList.add("active")
 }
 
-/* ---------- storage ---------- */
+/* ---------- storage refs ---------- */
 
-const REF_KEY="refs_v3"
+const REF_KEY="refs_v4"
 let REFS = JSON.parse(localStorage.getItem(REF_KEY)||"{}")
 function saveRefs(){localStorage.setItem(REF_KEY,JSON.stringify(REFS))}
 
@@ -98,10 +129,16 @@ function saveRefs(){localStorage.setItem(REF_KEY,JSON.stringify(REFS))}
 const eur = v => parseFloat((v||"").replace(/[^\d,.-]/g,"").replace(",", "."))||0
 const cleanRef = v => (v||"").trim()||"Sans référence"
 
-function monthKey(d){
- if(!d||!d.includes("/")) return null
+function parseDate(d){
+ if(!d||!d.includes("/")) return {}
  const [j,m,a]=d.split("/")
- return a+"-"+m
+ return {j:+j,m:+m,a:+a}
+}
+
+function monthKey(d){
+ const p=parseDate(d)
+ if(!p.a) return null
+ return p.a+"-"+String(p.m).padStart(2,"0")
 }
 
 /* ---------- data ---------- */
@@ -109,23 +146,59 @@ function monthKey(d){
 let DATA=[]
 let chart
 
+/* ---------- time filters ---------- */
+
+const MONTH_NAMES=["Jan","Fév","Mar","Avr","Mai","Jun","Jul","Aoû","Sep","Oct","Nov","Déc"]
+let selYears=new Set()
+let selMonths=new Set()
+
+function toggleYear(y){
+ selYears.has(y)?selYears.delete(y):selYears.add(y)
+ render()
+ renderYearButtons()
+}
+
+function toggleMonth(m){
+ selMonths.has(m)?selMonths.delete(m):selMonths.add(m)
+ render()
+ renderMonthButtons()
+}
+
+function renderYearButtons(){
+
+ const years=[...new Set(DATA.map(x=>x.y).filter(Boolean))].sort()
+
+ yearFilters.innerHTML = years.map(y=>`
+  <button class="filter-btn ${selYears.has(y)?"active":""}"
+   onclick="toggleYear(${y})">${y}</button>`).join("")
+}
+
+function renderMonthButtons(){
+
+ monthFilters.innerHTML = MONTH_NAMES.map((n,i)=>`
+  <button class="filter-btn ${selMonths.has(i+1)?"active":""}"
+   onclick="toggleMonth(${i+1})">${n}</button>`).join("")
+}
+
+function passTimeFilter(r){
+ if(selYears.size && !selYears.has(r.y)) return false
+ if(selMonths.size && !selMonths.has(r.m)) return false
+ return true
+}
+
 /* ---------- references ---------- */
 
-function ensureRef(code){
- if(!REFS[code]) REFS[code]=""
-}
+function ensureRef(c){ if(!REFS[c]) REFS[c]="" }
 
 function refreshRefUI(){
 
- // table
- refBody.innerHTML = Object.entries(REFS).sort().map(([code,name])=>`
+ refBody.innerHTML = Object.entries(REFS).sort().map(([c,n])=>`
  <tr>
-  <td contenteditable onblur="editRefCode('${code}',this.innerText)">${code}</td>
-  <td contenteditable onblur="editRefName('${code}',this.innerText)">${name}</td>
-  <td><button onclick="deleteRef('${code}')">🗑</button></td>
+  <td contenteditable onblur="editRefCode('${c}',this.innerText)">${c}</td>
+  <td contenteditable onblur="editRefName('${c}',this.innerText)">${n}</td>
+  <td><button onclick="deleteRef('${c}')">🗑</button></td>
  </tr>`).join("")
 
- // select
  addRefSelect.innerHTML = Object.keys(REFS).sort()
   .map(c=>`<option>${c}</option>`).join("")
 
@@ -134,48 +207,40 @@ function refreshRefUI(){
 
 function addReference(){
  const c=newRefCode.value.trim()
- if(!c) return
- if(REFS[c]){alert("Référence déjà existante");return}
+ if(!c||REFS[c]){alert("Code invalide ou existant");return}
  REFS[c]=newRefName.value.trim()
  refreshRefUI()
 }
 
-function deleteRef(code){
- if(!confirm("Supprimer référence ?")) return
- delete REFS[code]
- DATA.forEach(r=>{ if(r.ref===code) r.ref="Sans référence"; r.arr[5]=r.ref })
- refreshRefUI()
- render()
-}
+function editRefName(c,v){REFS[c]=v.trim();saveRefs()}
 
-function editRefName(code,val){
- REFS[code]=val.trim()
- saveRefs()
-}
+function editRefCode(oldC,newC){
 
-function editRefCode(oldCode,newCode){
-
- newCode=newCode.trim()
- if(!newCode) return
- if(newCode!==oldCode && REFS[newCode]){
-   alert("Code déjà existant"); refreshRefUI(); return
+ newC=newC.trim()
+ if(!newC|| (newC!==oldC && REFS[newC])){
+  alert("Code déjà existant"); refreshRefUI(); return
  }
 
- REFS[newCode]=REFS[oldCode]
- delete REFS[oldCode]
+ REFS[newC]=REFS[oldC]
+ delete REFS[oldC]
 
  DATA.forEach(r=>{
-   if(r.ref===oldCode){
-     r.ref=newCode
-     r.arr[5]=newCode
-   }
+  if(r.ref===oldC){r.ref=newC; r.arr[5]=newC}
  })
 
  refreshRefUI()
  render()
 }
 
-/* ---------- achats ops ---------- */
+function deleteRef(c){
+ if(!confirm("Supprimer ?")) return
+ delete REFS[c]
+ DATA.forEach(r=>{ if(r.ref===c){r.ref="Sans référence";r.arr[5]=r.ref}})
+ refreshRefUI()
+ render()
+}
+
+/* ---------- achats ---------- */
 
 function addRow(){
  const f=addF.value.trim()
@@ -187,8 +252,17 @@ function addRow(){
 
  if(!f||!d||!ht){alert("Champs requis");return}
 
- DATA.push({arr:[f,d,c,ht,t,r],month:monthKey(d),ref:r})
+ const p=parseDate(d)
+ DATA.push({
+  arr:[f,d,c,ht,t,r],
+  ref:r,
+  month:monthKey(d),
+  y:p.a,
+  m:p.m
+ })
+
  render()
+ renderYearButtons()
 }
 
 /* ---------- rows edit ---------- */
@@ -207,14 +281,15 @@ function editRow(i){
 
 function refSelectHTML(sel){
  return `<select>${
-   Object.keys(REFS).map(k=>`<option ${k===sel?"selected":""}>${k}</option>`).join("")
+  Object.keys(REFS).map(k=>`<option ${k===sel?"selected":""}>${k}</option>`).join("")
  }</select>`
 }
 
 function saveRow(i){
  const cells=tbody.children[i].querySelectorAll("input,select")
  const a=[...cells].map(x=>x.value)
- DATA[i]={arr:a,month:monthKey(a[1]),ref:a[5]}
+ const p=parseDate(a[1])
+ DATA[i]={arr:a,ref:a[5],month:monthKey(a[1]),y:p.a,m:p.m}
  render()
 }
 
@@ -230,35 +305,38 @@ function render(){
 
  let total=0, html=""
 
- for(let i=0;i<DATA.length;i++){
-  const r=DATA[i]
+ const rows = DATA.filter(passTimeFilter)
+
+ rows.forEach(r=>{
   total+=eur(r.arr[3])
+  const i=DATA.indexOf(r)
+
   html+=`<tr>
    ${r.arr.map(v=>`<td>${v}</td>`).join("")}
    <td>
     <button onclick="editRow(${i})">✏️</button>
     <button onclick="deleteRow(${i})">🗑</button>
    </td></tr>`
- }
+ })
 
  tbody.innerHTML=html
  totalEl.textContent=total.toLocaleString()+" €"
- buildChart()
+ buildChart(rows)
 }
 
 /* ---------- chart ---------- */
 
-function buildChart(){
+function buildChart(rows){
 
  const map={}
- for(const r of DATA){
+ for(const r of rows){
   if(!r.month) continue
   if(!map[r.month]) map[r.month]={}
   map[r.month][r.ref]=(map[r.month][r.ref]||0)+eur(r.arr[3])
  }
 
  const months=Object.keys(map).sort()
- const refs=[...new Set(DATA.map(r=>r.ref))]
+ const refs=[...new Set(rows.map(r=>r.ref))]
 
  const datasets=refs.map(ref=>({
   label:ref,
@@ -286,14 +364,20 @@ fetch("data.csv")
    const ref=cleanRef(row[7])
    ensureRef(ref)
 
+   const p=parseDate(row[1])
+
    DATA.push({
     arr:[row[0],row[1],row[2],row[3],row[6],ref],
+    ref,
     month:monthKey(row[1]),
-    ref
+    y:p.a,
+    m:p.m
    })
   })
 
   refreshRefUI()
+  renderYearButtons()
+  renderMonthButtons()
   render()
  }
 }))
