@@ -8,47 +8,15 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
-body{
- font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial;
- background:#f5f5f7;
- margin:40px;
-}
-.tabs button{
- padding:10px 16px;
- border-radius:10px;
- border:1px solid #ddd;
- background:white;
- cursor:pointer;
- margin-right:8px;
-}
+body{font-family:-apple-system,Segoe UI,Arial;background:#f5f5f7;margin:40px}
+.tabs button{padding:10px 16px;border-radius:10px;border:1px solid #ddd;background:white;cursor:pointer;margin-right:8px}
 .tab{display:none}
 .tab.active{display:block}
-
-.card{
- background:white;
- border-radius:18px;
- padding:20px;
- margin-bottom:20px;
- box-shadow:0 4px 20px rgba(0,0,0,.06);
-}
-input,select,button{
- padding:8px;
- border-radius:10px;
- border:1px solid #ddd;
- margin:4px;
-}
-button{cursor:pointer}
-table{
- width:100%;
- border-collapse:collapse;
- background:white;
-}
-th,td{
- padding:10px;
- border-bottom:1px solid #eee;
-}
+.card{background:white;border-radius:18px;padding:20px;margin-bottom:20px;box-shadow:0 4px 20px rgba(0,0,0,.06)}
+input,select,button{padding:8px;border-radius:10px;border:1px solid #ddd;margin:4px}
+table{width:100%;border-collapse:collapse;background:white}
+th,td{padding:10px;border-bottom:1px solid #eee}
 th{background:#fafafa}
-.kpi{font-size:22px;font-weight:600}
 </style>
 </head>
 
@@ -64,7 +32,7 @@ th{background:#fafafa}
 <div id="achats" class="tab active">
 
 <div class="card">
-<b>Ajouter une ligne</b><br>
+<b>Ajouter ligne</b><br>
 <input id="addF" placeholder="Fournisseur">
 <input id="addDate" placeholder="Date jj/mm/aaaa">
 <input id="addCom" placeholder="Commentaire">
@@ -74,24 +42,14 @@ th{background:#fafafa}
 <button onclick="addRow()">➕ Ajouter</button>
 </div>
 
-<div class="card kpi">
-Total HT : <span id="total">0 €</span>
-</div>
-
-<div class="card">
-<canvas id="chart" height="120"></canvas>
-</div>
+<div class="card">Total : <b id="total"></b></div>
+<div class="card"><canvas id="chart"></canvas></div>
 
 <table>
 <thead>
 <tr>
-<th>Fournisseur</th>
-<th>Date</th>
-<th>Commentaire</th>
-<th>€ HT</th>
-<th>Type</th>
-<th>Réf</th>
-<th></th>
+<th>Fournisseur</th><th>Date</th><th>Commentaire</th>
+<th>€</th><th>Type</th><th>Réf</th><th></th>
 </tr>
 </thead>
 <tbody id="tbody"></tbody>
@@ -104,7 +62,6 @@ Total HT : <span id="total">0 €</span>
 <div id="refs" class="tab">
 
 <div class="card">
-<b>Ajouter référence</b><br>
 <input id="newRefCode" placeholder="Code">
 <input id="newRefName" placeholder="Désignation">
 <button onclick="addReference()">➕ Ajouter</button>
@@ -112,7 +69,9 @@ Total HT : <span id="total">0 €</span>
 
 <div class="card">
 <table>
-<thead><tr><th>Code</th><th>Désignation</th></tr></thead>
+<thead>
+<tr><th>Code</th><th>Désignation</th><th></th></tr>
+</thead>
 <tbody id="refBody"></tbody>
 </table>
 </div>
@@ -128,104 +87,114 @@ function showTab(id){
  document.getElementById(id).classList.add("active")
 }
 
-/* ---------- refs storage ---------- */
+/* ---------- storage ---------- */
 
-const REF_KEY="refs_design_v2"
+const REF_KEY="refs_v3"
 let REFS = JSON.parse(localStorage.getItem(REF_KEY)||"{}")
-
-function saveRefs(){
- localStorage.setItem(REF_KEY, JSON.stringify(REFS))
-}
+function saveRefs(){localStorage.setItem(REF_KEY,JSON.stringify(REFS))}
 
 /* ---------- utils ---------- */
 
-function eur(v){
- return parseFloat((v||"").replace(/[^\d,.-]/g,"").replace(",", "."))||0;
-}
-
-function cleanRef(v){
- v=(v||"").trim();
- return v?v:"Sans référence";
-}
+const eur = v => parseFloat((v||"").replace(/[^\d,.-]/g,"").replace(",", "."))||0
+const cleanRef = v => (v||"").trim()||"Sans référence"
 
 function monthKey(d){
- if(!d||!d.includes("/")) return null;
- const [j,m,a]=d.split("/");
- return a+"-"+m;
+ if(!d||!d.includes("/")) return null
+ const [j,m,a]=d.split("/")
+ return a+"-"+m
 }
 
 /* ---------- data ---------- */
 
-let DATA=[];
-let chart;
+let DATA=[]
+let chart
 
 /* ---------- references ---------- */
 
 function ensureRef(code){
- if(!REFS[code]) REFS[code]="";
+ if(!REFS[code]) REFS[code]=""
 }
 
 function refreshRefUI(){
 
- // tableau refs
- refBody.innerHTML = Object.keys(REFS).sort().map(code=>`
-  <tr>
-    <td>${code}</td>
-    <td contenteditable onblur="editRef('${code}',this.innerText)">
-      ${REFS[code]}
-    </td>
-  </tr>`).join("");
+ // table
+ refBody.innerHTML = Object.entries(REFS).sort().map(([code,name])=>`
+ <tr>
+  <td contenteditable onblur="editRefCode('${code}',this.innerText)">${code}</td>
+  <td contenteditable onblur="editRefName('${code}',this.innerText)">${name}</td>
+  <td><button onclick="deleteRef('${code}')">🗑</button></td>
+ </tr>`).join("")
 
- // select ajout
+ // select
  addRefSelect.innerHTML = Object.keys(REFS).sort()
-   .map(code=>`<option value="${code}">${code}</option>`).join("");
+  .map(c=>`<option>${c}</option>`).join("")
 
- saveRefs();
-}
-
-function editRef(code,val){
- REFS[code]=val.trim();
- saveRefs();
+ saveRefs()
 }
 
 function addReference(){
- const c=newRefCode.value.trim();
- if(!c) return;
- ensureRef(c);
- REFS[c]=newRefName.value.trim();
- refreshRefUI();
+ const c=newRefCode.value.trim()
+ if(!c) return
+ if(REFS[c]){alert("Référence déjà existante");return}
+ REFS[c]=newRefName.value.trim()
+ refreshRefUI()
+}
+
+function deleteRef(code){
+ if(!confirm("Supprimer référence ?")) return
+ delete REFS[code]
+ DATA.forEach(r=>{ if(r.ref===code) r.ref="Sans référence"; r.arr[5]=r.ref })
+ refreshRefUI()
+ render()
+}
+
+function editRefName(code,val){
+ REFS[code]=val.trim()
+ saveRefs()
+}
+
+function editRefCode(oldCode,newCode){
+
+ newCode=newCode.trim()
+ if(!newCode) return
+ if(newCode!==oldCode && REFS[newCode]){
+   alert("Code déjà existant"); refreshRefUI(); return
+ }
+
+ REFS[newCode]=REFS[oldCode]
+ delete REFS[oldCode]
+
+ DATA.forEach(r=>{
+   if(r.ref===oldCode){
+     r.ref=newCode
+     r.arr[5]=newCode
+   }
+ })
+
+ refreshRefUI()
+ render()
 }
 
 /* ---------- achats ops ---------- */
 
 function addRow(){
+ const f=addF.value.trim()
+ const d=addDate.value.trim()
+ const c=addCom.value.trim()
+ const ht=addHt.value.trim()
+ const t=addType.value.trim()
+ const r=addRefSelect.value
 
- const f=addF.value.trim();
- const d=addDate.value.trim();
- const c=addCom.value.trim();
- const ht=addHt.value.trim();
- const t=addType.value.trim();
- const r=addRefSelect.value;
+ if(!f||!d||!ht){alert("Champs requis");return}
 
- if(!f||!d||!ht){
-   alert("Fournisseur, date, montant requis");
-   return;
- }
-
- DATA.push({
-   arr:[f,d,c,ht,t,r],
-   month:monthKey(d),
-   ref:r
- });
-
- render();
+ DATA.push({arr:[f,d,c,ht,t,r],month:monthKey(d),ref:r})
+ render()
 }
 
-/* ---------- edit rows ---------- */
+/* ---------- rows edit ---------- */
 
 function editRow(i){
- const r=DATA[i].arr;
-
+ const r=DATA[i].arr
  tbody.children[i].innerHTML = `
 <td><input value="${r[0]}"></td>
 <td><input value="${r[1]}"></td>
@@ -233,84 +202,75 @@ function editRow(i){
 <td><input value="${r[3]}"></td>
 <td><input value="${r[4]}"></td>
 <td>${refSelectHTML(r[5])}</td>
-<td><button onclick="saveRow(${i})">💾</button></td>`;
+<td><button onclick="saveRow(${i})">💾</button></td>`
 }
 
-function refSelectHTML(selected){
- return `<select>
- ${Object.keys(REFS).map(k=>
-   `<option ${k===selected?"selected":""}>${k}</option>`
- ).join("")}
- </select>`;
+function refSelectHTML(sel){
+ return `<select>${
+   Object.keys(REFS).map(k=>`<option ${k===sel?"selected":""}>${k}</option>`).join("")
+ }</select>`
 }
 
 function saveRow(i){
- const cells=tbody.children[i].querySelectorAll("input,select");
- const a=[...cells].map(x=>x.value);
-
- DATA[i]={arr:a,month:monthKey(a[1]),ref:a[5]};
- render();
+ const cells=tbody.children[i].querySelectorAll("input,select")
+ const a=[...cells].map(x=>x.value)
+ DATA[i]={arr:a,month:monthKey(a[1]),ref:a[5]}
+ render()
 }
 
 function deleteRow(i){
- if(!confirm("Supprimer cette ligne ?")) return;
- DATA.splice(i,1);
- render();
+ if(!confirm("Supprimer ligne ?")) return
+ DATA.splice(i,1)
+ render()
 }
 
 /* ---------- render ---------- */
 
 function render(){
 
- let total=0;
- let html="";
+ let total=0, html=""
 
  for(let i=0;i<DATA.length;i++){
-  const r=DATA[i];
-  total+=eur(r.arr[3]);
-
-  html+=`
-  <tr>
-    ${r.arr.map(v=>`<td>${v}</td>`).join("")}
-    <td>
-      <button onclick="editRow(${i})">✏️</button>
-      <button onclick="deleteRow(${i})">🗑</button>
-    </td>
-  </tr>`;
+  const r=DATA[i]
+  total+=eur(r.arr[3])
+  html+=`<tr>
+   ${r.arr.map(v=>`<td>${v}</td>`).join("")}
+   <td>
+    <button onclick="editRow(${i})">✏️</button>
+    <button onclick="deleteRow(${i})">🗑</button>
+   </td></tr>`
  }
 
- tbody.innerHTML=html;
- totalEl.textContent=total.toLocaleString()+" €";
- buildChart();
+ tbody.innerHTML=html
+ totalEl.textContent=total.toLocaleString()+" €"
+ buildChart()
 }
 
 /* ---------- chart ---------- */
 
 function buildChart(){
 
- const map={};
-
+ const map={}
  for(const r of DATA){
-  if(!r.month) continue;
-  if(!map[r.month]) map[r.month]={};
-  map[r.month][r.ref]=(map[r.month][r.ref]||0)+eur(r.arr[3]);
+  if(!r.month) continue
+  if(!map[r.month]) map[r.month]={}
+  map[r.month][r.ref]=(map[r.month][r.ref]||0)+eur(r.arr[3])
  }
 
- const months=Object.keys(map).sort();
- const refs=[...new Set(DATA.map(r=>r.ref))];
+ const months=Object.keys(map).sort()
+ const refs=[...new Set(DATA.map(r=>r.ref))]
 
  const datasets=refs.map(ref=>({
-   label:ref,
-   data:months.map(m=>map[m][ref]||0)
- }));
+  label:ref,
+  data:months.map(m=>map[m][ref]||0)
+ }))
 
- if(chart) chart.destroy();
-
+ if(chart) chart.destroy()
  chart=new Chart(chartEl,{
-   type:"bar",
-   data:{labels:months,datasets},
-   options:{animation:false,scales:{x:{stacked:true},y:{stacked:true}}}
- });
+  type:"bar",
+  data:{labels:months,datasets},
+  options:{animation:false,scales:{x:{stacked:true},y:{stacked:true}}}
+ })
 }
 
 /* ---------- csv load ---------- */
@@ -321,27 +281,26 @@ fetch("data.csv")
  skipEmptyLines:true,
  complete: res => {
 
-   res.data.slice(2).forEach(row=>{
-     if(!row[0]) return;
+  res.data.slice(2).forEach(row=>{
+   if(!row[0]) return
+   const ref=cleanRef(row[7])
+   ensureRef(ref)
 
-     const ref=cleanRef(row[7]);
-     ensureRef(ref);
+   DATA.push({
+    arr:[row[0],row[1],row[2],row[3],row[6],ref],
+    month:monthKey(row[1]),
+    ref
+   })
+  })
 
-     DATA.push({
-       arr:[row[0],row[1],row[2],row[3],row[6],ref],
-       month:monthKey(row[1]),
-       ref:ref
-     });
-   });
-
-   refreshRefUI();
-   render();
+  refreshRefUI()
+  render()
  }
-}));
+}))
 
-const tbody=document.getElementById("tbody");
-const totalEl=document.getElementById("total");
-const chartEl=document.getElementById("chart");
+const tbody=document.getElementById("tbody")
+const totalEl=document.getElementById("total")
+const chartEl=document.getElementById("chart")
 
 </script>
 </body>
