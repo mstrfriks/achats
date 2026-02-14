@@ -2,104 +2,55 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<title>Suivi achats V3</title>
+<title>Suivi achats V3 fast</title>
 
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
 body{font-family:-apple-system,Segoe UI,Arial;background:#f5f5f7;margin:30px}
-.tabbar button{padding:10px 16px;border-radius:12px;border:1px solid #ddd;background:white;cursor:pointer;margin-right:8px}
-.tab{display:none}
-.tab.active{display:block}
 .card{background:white;border-radius:16px;padding:16px;margin-bottom:16px;box-shadow:0 4px 16px rgba(0,0,0,.06)}
 table{width:100%;border-collapse:collapse}
 th,td{padding:8px;border-bottom:1px solid #eee}
-th{background:#fafafa}
-input,button{padding:6px;border-radius:8px;border:1px solid #ddd}
-button{cursor:pointer;background:#0071e3;color:white;border:none}
-.colorbox{width:14px;height:14px;border-radius:4px;display:inline-block}
-.small{font-size:12px;color:#666}
+button{padding:6px 10px;border-radius:8px;border:1px solid #ddd;background:#0071e3;color:white}
+input{padding:6px;border-radius:8px;border:1px solid #ddd}
 </style>
 </head>
 
 <body>
 
-<div class="tabbar">
-<button onclick="showTab('achats')">📊 Achats</button>
-<button onclick="showTab('refs')">🏷 Références</button>
-<button onclick="showTab('hist')">🕓 Historique</button>
-</div>
-
-<!-- ================= ACHATS ================= -->
-
-<div id="achats" class="tab active">
-
 <div class="card">
-<b>Ajouter ligne</b><br>
 <input id="addF" placeholder="Fournisseur">
-<input id="addDate" placeholder="Date jj/mm/aaaa">
-<input id="addCom" placeholder="Commentaire">
+<input id="addDate" placeholder="Date">
 <input id="addHt" placeholder="Montant">
-<input id="addType" placeholder="Type">
-<input id="addRef" placeholder="Réf">
+<input id="addRef" placeholder="Ref">
 <button onclick="addRow()">Ajouter</button>
-<button onclick="exportCSV()">📤 Export CSV</button>
-<div class="small">Source CSV chargée : <span id="syncTime"></span></div>
 </div>
 
-<div class="card">Total : <b id="total">0 €</b></div>
-
-<div class="card"><canvas id="chart" height="120"></canvas></div>
+<div class="card">Total : <b id="total"></b></div>
+<div class="card"><canvas id="chart"></canvas></div>
 
 <table>
 <thead>
 <tr>
-<th>Fournisseur</th><th>Date</th><th>Commentaire</th>
-<th>€</th><th>Type</th><th>Réf</th><th></th>
+<th>Fournisseur</th><th>Date</th><th>€</th><th>Ref</th><th></th>
 </tr>
 </thead>
 <tbody id="tbody"></tbody>
 </table>
 
-</div>
-
-<!-- ================= REFERENCES ================= -->
-
-<div id="refs" class="tab">
-<div class="card">
-<input id="newRefCode" placeholder="Code">
-<input id="newRefName" placeholder="Désignation">
-<button onclick="addRef()">Ajouter</button>
-</div>
-
-<table>
-<thead><tr><th></th><th>Code</th><th>Désignation</th></tr></thead>
-<tbody id="refBody"></tbody>
-</table>
-</div>
-
-<!-- ================= HIST ================= -->
-
-<div id="hist" class="tab">
-<table>
-<thead><tr><th>Date</th><th>Action</th><th>Détail</th></tr></thead>
-<tbody id="histBody"></tbody>
-</table>
-</div>
-
 <script>
 
-/* ================= STORAGE KEYS ================= */
+/* ========= FAST STORAGE CACHE ========= */
 
-const DATA_KEY="v3_data"
-const REF_KEY="v3_refs"
-const HIST_KEY="v3_hist"
+const DATA_KEY="fast_data"
+let DATA = JSON.parse(localStorage.getItem(DATA_KEY)||"[]")
+let chart=null
+let lastHash=""
 
-/* ================= UTILS ================= */
+/* ========= UTILS ========= */
 
-function eur(v){return parseFloat((v||"").replace(/[^\d,.-]/g,"").replace(",", "."))||0}
-function cleanRef(r){return r&&r.trim()?r.trim():"Sans référence"}
+const eur = v => parseFloat((v||"").replace(/[^\d,.-]/g,"").replace(",", "."))||0
 
 function monthKey(d){
  if(!d.includes("/")) return null
@@ -107,199 +58,103 @@ function monthKey(d){
  return a+"-"+m
 }
 
-function colorFromString(s){
- let h=0; for(let i=0;i<s.length;i++) h=s.charCodeAt(i)+((h<<5)-h)
- return `hsl(${h%360},70%,55%)`
+/* ========= DATA OPS ========= */
+
+function saveData(){
+ localStorage.setItem(DATA_KEY,JSON.stringify(DATA))
 }
-
-/* ================= STORAGE ================= */
-
-function loadData(){return JSON.parse(localStorage.getItem(DATA_KEY)||"[]")}
-function saveData(){localStorage.setItem(DATA_KEY,JSON.stringify(DATA))}
-
-function loadRefs(){return JSON.parse(localStorage.getItem(REF_KEY)||"{}")}
-function saveRefs(r){localStorage.setItem(REF_KEY,JSON.stringify(r))}
-
-function loadHist(){return JSON.parse(localStorage.getItem(HIST_KEY)||"[]")}
-function saveHist(h){localStorage.setItem(HIST_KEY,JSON.stringify(h))}
-
-/* ================= HIST ================= */
-
-function logHist(a,d){
- const h=loadHist()
- h.unshift({t:new Date().toLocaleString(),a,d})
- saveHist(h)
- renderHist()
-}
-
-function renderHist(){
- histBody.innerHTML=loadHist().map(x=>
- `<tr><td>${x.t}</td><td>${x.a}</td><td>${x.d}</td></tr>`).join("")
-}
-
-/* ================= TABS ================= */
-
-function showTab(id){
- document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"))
- document.getElementById(id).classList.add("active")
-}
-
-/* ================= REFERENCES ================= */
-
-function addRef(){
- const c=newRefCode.value.trim()
- if(!c) return
- const r=loadRefs()
- r[c]={name:newRefName.value,color:colorFromString(c)}
- saveRefs(r)
- logHist("REF ADD",c)
- renderRefs()
-}
-
-function renderRefs(){
- const r=loadRefs()
- refBody.innerHTML=Object.entries(r).map(([c,v])=>
- `<tr>
-  <td><span class="colorbox" style="background:${v.color}"></span></td>
-  <td>${c}</td>
-  <td contenteditable onblur="editRef('${c}',this.innerText)">${v.name||""}</td>
- </tr>`).join("")
-}
-
-function editRef(c,n){
- const r=loadRefs(); r[c].name=n; saveRefs(r)
- logHist("REF EDIT",c)
-}
-
-/* ================= DATA ================= */
-
-let DATA=loadData()
-let chart
 
 function addRow(){
- const f=addF.value,d=addDate.value,c=addCom.value,ht=addHt.value,t=addType.value,r=cleanRef(addRef.value)
- DATA.push({arr:[f,d,c,ht,t,r],month:monthKey(d),ref:r})
+ const f=addF.value,d=addDate.value,ht=addHt.value,r=addRef.value||"Sans référence"
+ DATA.push({arr:[f,d,ht,r],month:monthKey(d),ref:r})
  saveData()
- logHist("ADD",f+" "+ht)
- render()
+ renderFast()
 }
 
 function deleteRow(i){
  if(!confirm("Supprimer ?")) return
- logHist("DELETE",DATA[i].arr.join(" | "))
- DATA.splice(i,1); saveData(); render()
-}
-
-function editRow(i){
- const r=DATA[i].arr
- tbody.children[i].innerHTML=r.map(v=>`<td><input value="${v}"></td>`).join("")+
- `<td><button onclick="saveRow(${i})">💾</button></td>`
-}
-
-function saveRow(i){
- const inputs=tbody.children[i].querySelectorAll("input")
- const arr=[...inputs].map(x=>x.value)
- logHist("EDIT",DATA[i].arr.join(" | ")+" → "+arr.join(" | "))
- DATA[i]={arr,month:monthKey(arr[1]),ref:cleanRef(arr[5])}
+ DATA.splice(i,1)
  saveData()
- render()
+ renderFast()
 }
 
-/* ================= RENDER ================= */
+/* ========= FAST RENDER ========= */
 
-function render(){
+function renderFast(){
 
- tbody.innerHTML=""
+ /* ----- TABLE ----- */
+
  let total=0
+ let html=""
 
- DATA.forEach((r,i)=>{
- total+=eur(r.arr[3])
- tbody.innerHTML+=`
- <tr>
-  ${r.arr.map(v=>`<td>${v}</td>`).join("")}
-  <td>
-   <button onclick="editRow(${i})">✏️</button>
-   <button onclick="deleteRow(${i})">🗑</button>
-  </td>
- </tr>`
- })
+ for(let i=0;i<DATA.length;i++){
+  const r=DATA[i]
+  total+=eur(r.arr[2])
+  html+=`<tr>
+   <td>${r.arr[0]}</td>
+   <td>${r.arr[1]}</td>
+   <td>${r.arr[2]}</td>
+   <td>${r.arr[3]}</td>
+   <td><button onclick="deleteRow(${i})">🗑</button></td>
+  </tr>`
+ }
 
+ tbody.innerHTML=html
  totalEl.textContent=total.toLocaleString()+" €"
- buildChart()
-}
 
-function buildChart(){
+ /* ----- CHART (hash change only) ----- */
 
- const refs=loadRefs()
+ const hash = DATA.length + "-" + total
+ if(hash===lastHash) return
+ lastHash=hash
+
  const map={}
-
- DATA.forEach(r=>{
- if(!r.month) return
- if(!map[r.month]) map[r.month]={}
- map[r.month][r.ref]=(map[r.month][r.ref]||0)+eur(r.arr[3])
- })
+ for(const r of DATA){
+  if(!r.month) continue
+  if(!map[r.month]) map[r.month]={}
+  map[r.month][r.ref]=(map[r.month][r.ref]||0)+eur(r.arr[2])
+ }
 
  const months=Object.keys(map).sort()
+ const refs=[...new Set(DATA.map(x=>x.ref))]
 
- const datasets=Object.keys(
- months.reduce((s,m)=>{Object.keys(map[m]).forEach(k=>s[k]=1);return s},{})
- ).map(ref=>({
+ const datasets=refs.map(ref=>({
    label:ref,
-   data:months.map(m=>map[m][ref]||0),
-   backgroundColor:(refs[ref]||{}).color||colorFromString(ref)
+   data:months.map(m=>map[m][ref]||0)
  }))
 
  if(chart) chart.destroy()
 
  chart=new Chart(chartEl,{
- type:"bar",
- data:{labels:months,datasets},
- options:{scales:{x:{stacked:true},y:{stacked:true}}}
+   type:"bar",
+   data:{labels:months,datasets},
+   options:{animation:false,scales:{x:{stacked:true},y:{stacked:true}}}
  })
 }
 
-/* ================= EXPORT ================= */
-
-function exportCSV(){
- const rows=[["Fournisseur","Date","Commentaire","HT","Type","Ref"],
- ...DATA.map(r=>r.arr)]
- const csv=rows.map(r=>r.join(";")).join("\n")
- const blob=new Blob([csv])
- const a=document.createElement("a")
- a.href=URL.createObjectURL(blob)
- a.download="export.csv"
- a.click()
-}
-
-/* ================= LOAD CSV SOURCE ================= */
+/* ========= CSV LOAD ========= */
 
 fetch("data.csv")
 .then(r=>r.text())
 .then(csv=>{
- syncTime.textContent=new Date().toLocaleString()
-
  Papa.parse(csv,{
- skipEmptyLines:true,
- complete: res=>{
-  res.data.slice(2).forEach(row=>{
-   if(!row[0]) return
-   DATA.push({
-     arr:[row[0],row[1],row[2],row[3],row[6],cleanRef(row[7])],
-     month:monthKey(row[1]),
-     ref:cleanRef(row[7])
-   })
-  })
-  saveData()
-  render()
- }
-})
+  skipEmptyLines:true,
+  complete: res=>{
+   for(const row of res.data.slice(2)){
+    if(!row[0]) continue
+    DATA.push({
+      arr:[row[0],row[1],row[3],row[7]||"Sans référence"],
+      month:monthKey(row[1]),
+      ref:row[7]||"Sans référence"
+    })
+   }
+   saveData()
+   renderFast()
+  }
+ })
 })
 
-/* ================= INIT ================= */
-
-renderRefs()
-renderHist()
-render()
+renderFast()
 
 </script>
 </body>
