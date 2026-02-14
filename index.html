@@ -2,16 +2,20 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<title>Suivi achats</title>
+<title>Suivi des achats</title>
 
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
-body{font-family:-apple-system,Segoe UI,Arial;background:#f5f5f7;margin:30px}
-.tabbar button{
+body{
+ font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial;
+ background:#f5f5f7;
+ margin:40px;
+}
+.tabs button{
  padding:10px 16px;
- border-radius:12px;
+ border-radius:10px;
  border:1px solid #ddd;
  background:white;
  cursor:pointer;
@@ -22,26 +26,36 @@ body{font-family:-apple-system,Segoe UI,Arial;background:#f5f5f7;margin:30px}
 
 .card{
  background:white;
- border-radius:16px;
- padding:16px;
- margin-bottom:16px;
- box-shadow:0 4px 16px rgba(0,0,0,.06);
+ border-radius:18px;
+ padding:20px;
+ margin-bottom:20px;
+ box-shadow:0 4px 20px rgba(0,0,0,.06);
 }
-
-table{width:100%;border-collapse:collapse}
-th,td{padding:8px;border-bottom:1px solid #eee}
-th{background:#fafafa}
-input{padding:6px;border-radius:8px;border:1px solid #ddd}
-.colorbox{width:16px;height:16px;border-radius:4px;display:inline-block}
+input,select,button{
+ padding:8px;
+ border-radius:10px;
+ border:1px solid #ddd;
+ margin:4px;
+}
+table{
+ width:100%;
+ border-collapse:collapse;
+ background:white;
+}
+th,td{
+ padding:10px;
+ border-bottom:1px solid #eee;
+}
+th{background:#fafafa;cursor:pointer}
+.kpi{font-size:22px;font-weight:600}
 </style>
 </head>
 
 <body>
 
-<div class="tabbar">
-<button onclick="showTab('achats')">📊 Achats</button>
-<button onclick="showTab('refs')">🏷 Références</button>
-<button onclick="showTab('hist')">🕓 Historique</button>
+<div class="tabs">
+<button onclick="showTab('achats')">Achats</button>
+<button onclick="showTab('refs')">Références</button>
 </div>
 
 <!-- ================= ACHATS ================= -->
@@ -49,18 +63,18 @@ input{padding:6px;border-radius:8px;border:1px solid #ddd}
 <div id="achats" class="tab active">
 
 <div class="card">
-<b>Ajouter ligne</b><br>
+<b>Ajouter une ligne</b><br>
 <input id="addF" placeholder="Fournisseur">
 <input id="addDate" placeholder="Date jj/mm/aaaa">
 <input id="addCom" placeholder="Commentaire">
-<input id="addHt" placeholder="Montant">
+<input id="addHt" placeholder="Montant €">
 <input id="addType" placeholder="Type">
-<input id="addRef" placeholder="Réf">
+<input id="addRef" placeholder="Réf gestion">
 <button onclick="addRow()">Ajouter</button>
 </div>
 
-<div class="card">
-Total : <b id="total">0 €</b>
+<div class="card kpi">
+Total HT filtré : <span id="total">0 €</span>
 </div>
 
 <div class="card">
@@ -70,8 +84,13 @@ Total : <b id="total">0 €</b>
 <table>
 <thead>
 <tr>
-<th>Fournisseur</th><th>Date</th><th>Commentaire</th>
-<th>€</th><th>Type</th><th>Réf</th><th></th>
+<th data-col="0">Fournisseur</th>
+<th data-col="1">Date</th>
+<th data-col="2">Commentaire</th>
+<th data-col="3">€ HT</th>
+<th data-col="4">Type</th>
+<th data-col="5">Réf</th>
+<th></th>
 </tr>
 </thead>
 <tbody id="tbody"></tbody>
@@ -84,247 +103,201 @@ Total : <b id="total">0 €</b>
 <div id="refs" class="tab">
 
 <div class="card">
-<b>Ajouter référence</b><br>
-<input id="newRefCode" placeholder="Code">
-<input id="newRefName" placeholder="Désignation">
-<button onclick="addRef()">Ajouter</button>
-</div>
-
 <table>
-<thead><tr><th>Couleur</th><th>Code</th><th>Désignation</th></tr></thead>
+<thead>
+<tr>
+<th>Code</th>
+<th>Désignation</th>
+</tr>
+</thead>
 <tbody id="refBody"></tbody>
 </table>
-
 </div>
 
-<!-- ================= HISTORIQUE ================= -->
-
-<div id="hist" class="tab">
-<table>
-<thead><tr><th>Date</th><th>Action</th><th>Détail</th></tr></thead>
-<tbody id="histBody"></tbody>
-</table>
 </div>
 
 <script>
+
+/* ---------- tabs ---------- */
 
 function showTab(id){
  document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"))
  document.getElementById(id).classList.add("active")
 }
 
-/* ================= STORAGE ================= */
+/* ---------- refs storage ---------- */
 
-const REF_STORE_KEY="refs_v1"
-const HIST_STORE_KEY="hist_v1"
+const REF_KEY="ref_designations_v1"
+let REF_DESIG = JSON.parse(localStorage.getItem(REF_KEY)||"{}")
 
-function loadRefs(){
- return JSON.parse(localStorage.getItem(REF_STORE_KEY)||"{}")
-}
-function saveRefs(r){
- localStorage.setItem(REF_STORE_KEY,JSON.stringify(r))
+function saveRefDesig(){
+ localStorage.setItem(REF_KEY, JSON.stringify(REF_DESIG))
 }
 
-function loadHist(){
- return JSON.parse(localStorage.getItem(HIST_STORE_KEY)||"[]")
-}
-function saveHist(h){
- localStorage.setItem(HIST_STORE_KEY,JSON.stringify(h))
-}
-
-/* ================= COLORS ================= */
-
-function colorFromString(s){
- let h=0;
- for(let i=0;i<s.length;i++) h=s.charCodeAt(i)+((h<<5)-h)
- return `hsl(${h%360},70%,55%)`
-}
-
-/* ================= DATA ================= */
-
-let DATA=[]
-let chart
+/* ---------- utils ---------- */
 
 function eur(v){
- return parseFloat((v||"").replace(/[^\d,.-]/g,"").replace(",", "."))||0
+ return parseFloat((v||"").replace(/[^\d,.-]/g,"").replace(",", "."))||0;
 }
 
-function cleanRef(r){ return r&&r.trim()?r.trim():"Sans référence" }
+function cleanRef(v){
+ v=(v||"").trim();
+ return v?v:"Sans référence";
+}
+
+function parseDate(d){
+ if(!d||!d.includes("/")) return {};
+ const [j,m,a]=d.split("/");
+ return {j:+j,m:+m,a:+a};
+}
 
 function monthKey(d){
- if(!d.includes("/")) return null
- const [j,m,a]=d.split("/")
- return a+"-"+m
+ const p=parseDate(d);
+ if(!p.a) return null;
+ return p.a+"-"+String(p.m).padStart(2,"0");
 }
 
-/* ================= HIST ================= */
+/* ---------- data ---------- */
 
-function logHist(action,detail){
- const h=loadHist()
- h.unshift({t:new Date().toLocaleString(),action,detail})
- saveHist(h)
- renderHist()
+let DATA=[];
+let chart;
+
+/* ---------- refs tab ---------- */
+
+function refreshRefsTab(){
+
+ const set = new Set(DATA.map(x=>x.ref));
+ const rows = [...set].sort();
+
+ refBody.innerHTML = rows.map(code=>{
+
+   if(!REF_DESIG[code]) REF_DESIG[code]="";
+
+   return `<tr>
+     <td>${code}</td>
+     <td contenteditable
+         onblur="editRefDesig('${code}', this.innerText)">
+         ${REF_DESIG[code]}
+     </td>
+   </tr>`;
+ }).join("");
+
+ saveRefDesig();
 }
 
-function renderHist(){
- const h=loadHist()
- histBody.innerHTML=h.map(x=>`<tr><td>${x.t}</td><td>${x.action}</td><td>${x.detail}</td></tr>`).join("")
+function editRefDesig(code,val){
+ REF_DESIG[code]=val.trim();
+ saveRefDesig();
 }
 
-/* ================= REFERENCES ================= */
-
-function addRef(){
- const code=newRefCode.value.trim()
- const name=newRefName.value.trim()
- if(!code) return
- const refs=loadRefs()
- refs[code]={name,color:colorFromString(code)}
- saveRefs(refs)
- logHist("REF ADD",code)
- renderRefs()
-}
-
-function renderRefs(){
- const refs=loadRefs()
- refBody.innerHTML=Object.entries(refs).map(([c,v])=>
- `<tr>
-   <td><span class="colorbox" style="background:${v.color}"></span></td>
-   <td>${c}</td>
-   <td contenteditable onblur="editRefName('${c}',this.innerText)">${v.name||""}</td>
- </tr>`).join("")
-}
-
-function editRefName(code,name){
- const refs=loadRefs()
- refs[code].name=name
- saveRefs(refs)
- logHist("REF EDIT",code)
-}
-
-/* ================= ROWS ================= */
+/* ---------- achats ops ---------- */
 
 function addRow(){
 
- const f=addF.value
- const d=addDate.value
- const c=addCom.value
- const ht=addHt.value
- const t=addType.value
- const r=cleanRef(addRef.value)
+ const f=addF.value.trim();
+ const d=addDate.value.trim();
+ const c=addCom.value.trim();
+ const ht=addHt.value.trim();
+ const t=addType.value.trim();
+ const r=cleanRef(addRef.value);
 
- DATA.push({arr:[f,d,c,ht,t,r],month:monthKey(d),ref:r})
+ if(!f||!d||!ht){
+   alert("Fournisseur, date, montant requis");
+   return;
+ }
 
- logHist("ADD",`${f} ${ht}`)
+ DATA.push({
+   f, ref:r, month:monthKey(d),
+   arr:[f,d,c,ht,t,r]
+ });
 
- render()
+ render();
+ refreshRefsTab();
 }
 
 function deleteRow(i){
- if(!confirm("Supprimer ?")) return
- logHist("DELETE",DATA[i].arr.join(" | "))
- DATA.splice(i,1)
- render()
+ if(!confirm("Supprimer cette ligne ?")) return;
+ DATA.splice(i,1);
+ render();
+ refreshRefsTab();
 }
 
-function editRow(i){
-
- const r=DATA[i].arr
- tbody.children[i].innerHTML=r.map(v=>`<td><input value="${v}"></td>`).join("")+
- `<td><button onclick="saveRow(${i})">💾</button></td>`
-}
-
-function saveRow(i){
-
- const inputs=tbody.children[i].querySelectorAll("input")
- const old=DATA[i].arr.join(" | ")
-
- const arr=[...inputs].map(x=>x.value)
-
- DATA[i]={arr,month:monthKey(arr[1]),ref:cleanRef(arr[5])}
-
- logHist("EDIT",`${old} → ${arr.join(" | ")}`)
-
- render()
-}
-
-/* ================= RENDER ================= */
+/* ---------- render ---------- */
 
 function render(){
 
- let total=0
- tbody.innerHTML=""
+ let total=0;
+ tbody.innerHTML="";
 
- DATA.forEach((r,i)=>{
- total+=eur(r.arr[3])
- tbody.innerHTML+=`
- <tr>
-  ${r.arr.map(v=>`<td>${v}</td>`).join("")}
-  <td>
-   <button onclick="editRow(${i})">✏️</button>
-   <button onclick="deleteRow(${i})">🗑</button>
-  </td>
- </tr>`
- })
+ DATA.forEach((x,i)=>{
+   total+=eur(x.arr[3]);
+   tbody.innerHTML+=`
+   <tr>
+     ${x.arr.map(v=>`<td>${v}</td>`).join("")}
+     <td><button onclick="deleteRow(${i})">Supprimer</button></td>
+   </tr>`;
+ });
 
- totalEl.textContent=total.toLocaleString()+" €"
-
- buildChart()
+ totalEl.textContent=total.toLocaleString()+" €";
+ buildChart();
 }
+
+/* ---------- chart ---------- */
 
 function buildChart(){
 
- const refs=loadRefs()
- const map={}
+ const map={};
 
  DATA.forEach(r=>{
- if(!r.month) return
- if(!map[r.month]) map[r.month]={}
- map[r.month][r.ref]=(map[r.month][r.ref]||0)+eur(r.arr[3])
- })
+   if(!r.month) return;
+   if(!map[r.month]) map[r.month]={};
+   map[r.month][r.ref]=(map[r.month][r.ref]||0)+eur(r.arr[3]);
+ });
 
- const months=Object.keys(map).sort()
- const labels=months
+ const months=Object.keys(map).sort();
+ const refs=[...new Set(DATA.map(r=>r.ref))];
 
- const datasets=Object.keys(
- months.reduce((s,m)=>{Object.keys(map[m]).forEach(k=>s[k]=1);return s},{})
- ).map(ref=>({
+ const datasets=refs.map(ref=>({
    label:ref,
-   data:months.map(m=>map[m][ref]||0),
-   backgroundColor:(refs[ref]||{}).color || colorFromString(ref)
- }))
+   data:months.map(m=>map[m][ref]||0)
+ }));
 
- if(chart) chart.destroy()
+ if(chart) chart.destroy();
 
  chart=new Chart(chartEl,{
- type:"bar",
- data:{labels,datasets},
- options:{scales:{x:{stacked:true},y:{stacked:true}}}
- })
+   type:"bar",
+   data:{labels:months,datasets},
+   options:{animation:false,scales:{x:{stacked:true},y:{stacked:true}}}
+ });
 }
 
-/* ================= LOAD CSV ================= */
+/* ---------- csv load ---------- */
 
 fetch("data.csv")
 .then(r=>r.text())
 .then(csv=>Papa.parse(csv,{
  skipEmptyLines:true,
- complete: res=>{
-  res.data.slice(2).forEach(row=>{
-   if(!row[0]) return
-   DATA.push({
-     arr:[row[0],row[1],row[2],row[3],row[6],cleanRef(row[7])],
-     month:monthKey(row[1]),
-     ref:cleanRef(row[7])
-   })
-  })
-  render()
+ complete: res => {
+
+   res.data.slice(2).forEach(row=>{
+     if(!row[0]) return;
+
+     DATA.push({
+       f:row[0],
+       ref:cleanRef(row[7]),
+       month:monthKey(row[1]),
+       arr:[row[0],row[1],row[2],row[3],row[6],cleanRef(row[7])]
+     });
+   });
+
+   render();
+   refreshRefsTab();
  }
-}))
+}));
 
-/* ================= INIT ================= */
-
-renderRefs()
-renderHist()
+const tbody=document.getElementById("tbody");
+const totalEl=document.getElementById("total");
+const chartEl=document.getElementById("chart");
 
 </script>
 </body>
