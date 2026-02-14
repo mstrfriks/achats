@@ -37,6 +37,7 @@ input,select,button{
  border:1px solid #ddd;
  margin:4px;
 }
+button{cursor:pointer}
 table{
  width:100%;
  border-collapse:collapse;
@@ -46,7 +47,7 @@ th,td{
  padding:10px;
  border-bottom:1px solid #eee;
 }
-th{background:#fafafa;cursor:pointer}
+th{background:#fafafa}
 .kpi{font-size:22px;font-weight:600}
 </style>
 </head>
@@ -69,12 +70,12 @@ th{background:#fafafa;cursor:pointer}
 <input id="addCom" placeholder="Commentaire">
 <input id="addHt" placeholder="Montant €">
 <input id="addType" placeholder="Type">
-<input id="addRef" placeholder="Réf gestion">
-<button onclick="addRow()">Ajouter</button>
+<select id="addRefSelect"></select>
+<button onclick="addRow()">➕ Ajouter</button>
 </div>
 
 <div class="card kpi">
-Total HT filtré : <span id="total">0 €</span>
+Total HT : <span id="total">0 €</span>
 </div>
 
 <div class="card">
@@ -84,12 +85,12 @@ Total HT filtré : <span id="total">0 €</span>
 <table>
 <thead>
 <tr>
-<th data-col="0">Fournisseur</th>
-<th data-col="1">Date</th>
-<th data-col="2">Commentaire</th>
-<th data-col="3">€ HT</th>
-<th data-col="4">Type</th>
-<th data-col="5">Réf</th>
+<th>Fournisseur</th>
+<th>Date</th>
+<th>Commentaire</th>
+<th>€ HT</th>
+<th>Type</th>
+<th>Réf</th>
 <th></th>
 </tr>
 </thead>
@@ -103,13 +104,15 @@ Total HT filtré : <span id="total">0 €</span>
 <div id="refs" class="tab">
 
 <div class="card">
+<b>Ajouter référence</b><br>
+<input id="newRefCode" placeholder="Code">
+<input id="newRefName" placeholder="Désignation">
+<button onclick="addReference()">➕ Ajouter</button>
+</div>
+
+<div class="card">
 <table>
-<thead>
-<tr>
-<th>Code</th>
-<th>Désignation</th>
-</tr>
-</thead>
+<thead><tr><th>Code</th><th>Désignation</th></tr></thead>
 <tbody id="refBody"></tbody>
 </table>
 </div>
@@ -127,11 +130,11 @@ function showTab(id){
 
 /* ---------- refs storage ---------- */
 
-const REF_KEY="ref_designations_v1"
-let REF_DESIG = JSON.parse(localStorage.getItem(REF_KEY)||"{}")
+const REF_KEY="refs_design_v2"
+let REFS = JSON.parse(localStorage.getItem(REF_KEY)||"{}")
 
-function saveRefDesig(){
- localStorage.setItem(REF_KEY, JSON.stringify(REF_DESIG))
+function saveRefs(){
+ localStorage.setItem(REF_KEY, JSON.stringify(REFS))
 }
 
 /* ---------- utils ---------- */
@@ -145,16 +148,10 @@ function cleanRef(v){
  return v?v:"Sans référence";
 }
 
-function parseDate(d){
- if(!d||!d.includes("/")) return {};
- const [j,m,a]=d.split("/");
- return {j:+j,m:+m,a:+a};
-}
-
 function monthKey(d){
- const p=parseDate(d);
- if(!p.a) return null;
- return p.a+"-"+String(p.m).padStart(2,"0");
+ if(!d||!d.includes("/")) return null;
+ const [j,m,a]=d.split("/");
+ return a+"-"+m;
 }
 
 /* ---------- data ---------- */
@@ -162,32 +159,41 @@ function monthKey(d){
 let DATA=[];
 let chart;
 
-/* ---------- refs tab ---------- */
+/* ---------- references ---------- */
 
-function refreshRefsTab(){
-
- const set = new Set(DATA.map(x=>x.ref));
- const rows = [...set].sort();
-
- refBody.innerHTML = rows.map(code=>{
-
-   if(!REF_DESIG[code]) REF_DESIG[code]="";
-
-   return `<tr>
-     <td>${code}</td>
-     <td contenteditable
-         onblur="editRefDesig('${code}', this.innerText)">
-         ${REF_DESIG[code]}
-     </td>
-   </tr>`;
- }).join("");
-
- saveRefDesig();
+function ensureRef(code){
+ if(!REFS[code]) REFS[code]="";
 }
 
-function editRefDesig(code,val){
- REF_DESIG[code]=val.trim();
- saveRefDesig();
+function refreshRefUI(){
+
+ // tableau refs
+ refBody.innerHTML = Object.keys(REFS).sort().map(code=>`
+  <tr>
+    <td>${code}</td>
+    <td contenteditable onblur="editRef('${code}',this.innerText)">
+      ${REFS[code]}
+    </td>
+  </tr>`).join("");
+
+ // select ajout
+ addRefSelect.innerHTML = Object.keys(REFS).sort()
+   .map(code=>`<option value="${code}">${code}</option>`).join("");
+
+ saveRefs();
+}
+
+function editRef(code,val){
+ REFS[code]=val.trim();
+ saveRefs();
+}
+
+function addReference(){
+ const c=newRefCode.value.trim();
+ if(!c) return;
+ ensureRef(c);
+ REFS[c]=newRefName.value.trim();
+ refreshRefUI();
 }
 
 /* ---------- achats ops ---------- */
@@ -199,7 +205,7 @@ function addRow(){
  const c=addCom.value.trim();
  const ht=addHt.value.trim();
  const t=addType.value.trim();
- const r=cleanRef(addRef.value);
+ const r=addRefSelect.value;
 
  if(!f||!d||!ht){
    alert("Fournisseur, date, montant requis");
@@ -207,19 +213,49 @@ function addRow(){
  }
 
  DATA.push({
-   f, ref:r, month:monthKey(d),
-   arr:[f,d,c,ht,t,r]
+   arr:[f,d,c,ht,t,r],
+   month:monthKey(d),
+   ref:r
  });
 
  render();
- refreshRefsTab();
+}
+
+/* ---------- edit rows ---------- */
+
+function editRow(i){
+ const r=DATA[i].arr;
+
+ tbody.children[i].innerHTML = `
+<td><input value="${r[0]}"></td>
+<td><input value="${r[1]}"></td>
+<td><input value="${r[2]}"></td>
+<td><input value="${r[3]}"></td>
+<td><input value="${r[4]}"></td>
+<td>${refSelectHTML(r[5])}</td>
+<td><button onclick="saveRow(${i})">💾</button></td>`;
+}
+
+function refSelectHTML(selected){
+ return `<select>
+ ${Object.keys(REFS).map(k=>
+   `<option ${k===selected?"selected":""}>${k}</option>`
+ ).join("")}
+ </select>`;
+}
+
+function saveRow(i){
+ const cells=tbody.children[i].querySelectorAll("input,select");
+ const a=[...cells].map(x=>x.value);
+
+ DATA[i]={arr:a,month:monthKey(a[1]),ref:a[5]};
+ render();
 }
 
 function deleteRow(i){
  if(!confirm("Supprimer cette ligne ?")) return;
  DATA.splice(i,1);
  render();
- refreshRefsTab();
 }
 
 /* ---------- render ---------- */
@@ -227,17 +263,23 @@ function deleteRow(i){
 function render(){
 
  let total=0;
- tbody.innerHTML="";
+ let html="";
 
- DATA.forEach((x,i)=>{
-   total+=eur(x.arr[3]);
-   tbody.innerHTML+=`
-   <tr>
-     ${x.arr.map(v=>`<td>${v}</td>`).join("")}
-     <td><button onclick="deleteRow(${i})">Supprimer</button></td>
-   </tr>`;
- });
+ for(let i=0;i<DATA.length;i++){
+  const r=DATA[i];
+  total+=eur(r.arr[3]);
 
+  html+=`
+  <tr>
+    ${r.arr.map(v=>`<td>${v}</td>`).join("")}
+    <td>
+      <button onclick="editRow(${i})">✏️</button>
+      <button onclick="deleteRow(${i})">🗑</button>
+    </td>
+  </tr>`;
+ }
+
+ tbody.innerHTML=html;
  totalEl.textContent=total.toLocaleString()+" €";
  buildChart();
 }
@@ -248,11 +290,11 @@ function buildChart(){
 
  const map={};
 
- DATA.forEach(r=>{
-   if(!r.month) return;
-   if(!map[r.month]) map[r.month]={};
-   map[r.month][r.ref]=(map[r.month][r.ref]||0)+eur(r.arr[3]);
- });
+ for(const r of DATA){
+  if(!r.month) continue;
+  if(!map[r.month]) map[r.month]={};
+  map[r.month][r.ref]=(map[r.month][r.ref]||0)+eur(r.arr[3]);
+ }
 
  const months=Object.keys(map).sort();
  const refs=[...new Set(DATA.map(r=>r.ref))];
@@ -282,16 +324,18 @@ fetch("data.csv")
    res.data.slice(2).forEach(row=>{
      if(!row[0]) return;
 
+     const ref=cleanRef(row[7]);
+     ensureRef(ref);
+
      DATA.push({
-       f:row[0],
-       ref:cleanRef(row[7]),
+       arr:[row[0],row[1],row[2],row[3],row[6],ref],
        month:monthKey(row[1]),
-       arr:[row[0],row[1],row[2],row[3],row[6],cleanRef(row[7])]
+       ref:ref
      });
    });
 
+   refreshRefUI();
    render();
-   refreshRefsTab();
  }
 }));
 
