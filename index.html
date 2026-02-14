@@ -2,37 +2,24 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<title>Suivi achats</title>
+<title>Suivi achats V3</title>
 
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
 body{font-family:-apple-system,Segoe UI,Arial;background:#f5f5f7;margin:30px}
-.tabbar button{
- padding:10px 16px;
- border-radius:12px;
- border:1px solid #ddd;
- background:white;
- cursor:pointer;
- margin-right:8px;
-}
+.tabbar button{padding:10px 16px;border-radius:12px;border:1px solid #ddd;background:white;cursor:pointer;margin-right:8px}
 .tab{display:none}
 .tab.active{display:block}
-
-.card{
- background:white;
- border-radius:16px;
- padding:16px;
- margin-bottom:16px;
- box-shadow:0 4px 16px rgba(0,0,0,.06);
-}
-
+.card{background:white;border-radius:16px;padding:16px;margin-bottom:16px;box-shadow:0 4px 16px rgba(0,0,0,.06)}
 table{width:100%;border-collapse:collapse}
 th,td{padding:8px;border-bottom:1px solid #eee}
 th{background:#fafafa}
-input{padding:6px;border-radius:8px;border:1px solid #ddd}
-.colorbox{width:16px;height:16px;border-radius:4px;display:inline-block}
+input,button{padding:6px;border-radius:8px;border:1px solid #ddd}
+button{cursor:pointer;background:#0071e3;color:white;border:none}
+.colorbox{width:14px;height:14px;border-radius:4px;display:inline-block}
+.small{font-size:12px;color:#666}
 </style>
 </head>
 
@@ -57,15 +44,13 @@ input{padding:6px;border-radius:8px;border:1px solid #ddd}
 <input id="addType" placeholder="Type">
 <input id="addRef" placeholder="Réf">
 <button onclick="addRow()">Ajouter</button>
+<button onclick="exportCSV()">📤 Export CSV</button>
+<div class="small">Source CSV chargée : <span id="syncTime"></span></div>
 </div>
 
-<div class="card">
-Total : <b id="total">0 €</b>
-</div>
+<div class="card">Total : <b id="total">0 €</b></div>
 
-<div class="card">
-<canvas id="chart" height="120"></canvas>
-</div>
+<div class="card"><canvas id="chart" height="120"></canvas></div>
 
 <table>
 <thead>
@@ -82,22 +67,19 @@ Total : <b id="total">0 €</b>
 <!-- ================= REFERENCES ================= -->
 
 <div id="refs" class="tab">
-
 <div class="card">
-<b>Ajouter référence</b><br>
 <input id="newRefCode" placeholder="Code">
 <input id="newRefName" placeholder="Désignation">
 <button onclick="addRef()">Ajouter</button>
 </div>
 
 <table>
-<thead><tr><th>Couleur</th><th>Code</th><th>Désignation</th></tr></thead>
+<thead><tr><th></th><th>Code</th><th>Désignation</th></tr></thead>
 <tbody id="refBody"></tbody>
 </table>
-
 </div>
 
-<!-- ================= HISTORIQUE ================= -->
+<!-- ================= HIST ================= -->
 
 <div id="hist" class="tab">
 <table>
@@ -108,48 +90,16 @@ Total : <b id="total">0 €</b>
 
 <script>
 
-function showTab(id){
- document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"))
- document.getElementById(id).classList.add("active")
-}
+/* ================= STORAGE KEYS ================= */
 
-/* ================= STORAGE ================= */
+const DATA_KEY="v3_data"
+const REF_KEY="v3_refs"
+const HIST_KEY="v3_hist"
 
-const REF_STORE_KEY="refs_v1"
-const HIST_STORE_KEY="hist_v1"
+/* ================= UTILS ================= */
 
-function loadRefs(){
- return JSON.parse(localStorage.getItem(REF_STORE_KEY)||"{}")
-}
-function saveRefs(r){
- localStorage.setItem(REF_STORE_KEY,JSON.stringify(r))
-}
-
-function loadHist(){
- return JSON.parse(localStorage.getItem(HIST_STORE_KEY)||"[]")
-}
-function saveHist(h){
- localStorage.setItem(HIST_STORE_KEY,JSON.stringify(h))
-}
-
-/* ================= COLORS ================= */
-
-function colorFromString(s){
- let h=0;
- for(let i=0;i<s.length;i++) h=s.charCodeAt(i)+((h<<5)-h)
- return `hsl(${h%360},70%,55%)`
-}
-
-/* ================= DATA ================= */
-
-let DATA=[]
-let chart
-
-function eur(v){
- return parseFloat((v||"").replace(/[^\d,.-]/g,"").replace(",", "."))||0
-}
-
-function cleanRef(r){ return r&&r.trim()?r.trim():"Sans référence" }
+function eur(v){return parseFloat((v||"").replace(/[^\d,.-]/g,"").replace(",", "."))||0}
+function cleanRef(r){return r&&r.trim()?r.trim():"Sans référence"}
 
 function monthKey(d){
  if(!d.includes("/")) return null
@@ -157,93 +107,101 @@ function monthKey(d){
  return a+"-"+m
 }
 
+function colorFromString(s){
+ let h=0; for(let i=0;i<s.length;i++) h=s.charCodeAt(i)+((h<<5)-h)
+ return `hsl(${h%360},70%,55%)`
+}
+
+/* ================= STORAGE ================= */
+
+function loadData(){return JSON.parse(localStorage.getItem(DATA_KEY)||"[]")}
+function saveData(){localStorage.setItem(DATA_KEY,JSON.stringify(DATA))}
+
+function loadRefs(){return JSON.parse(localStorage.getItem(REF_KEY)||"{}")}
+function saveRefs(r){localStorage.setItem(REF_KEY,JSON.stringify(r))}
+
+function loadHist(){return JSON.parse(localStorage.getItem(HIST_KEY)||"[]")}
+function saveHist(h){localStorage.setItem(HIST_KEY,JSON.stringify(h))}
+
 /* ================= HIST ================= */
 
-function logHist(action,detail){
+function logHist(a,d){
  const h=loadHist()
- h.unshift({t:new Date().toLocaleString(),action,detail})
+ h.unshift({t:new Date().toLocaleString(),a,d})
  saveHist(h)
  renderHist()
 }
 
 function renderHist(){
- const h=loadHist()
- histBody.innerHTML=h.map(x=>`<tr><td>${x.t}</td><td>${x.action}</td><td>${x.detail}</td></tr>`).join("")
+ histBody.innerHTML=loadHist().map(x=>
+ `<tr><td>${x.t}</td><td>${x.a}</td><td>${x.d}</td></tr>`).join("")
+}
+
+/* ================= TABS ================= */
+
+function showTab(id){
+ document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"))
+ document.getElementById(id).classList.add("active")
 }
 
 /* ================= REFERENCES ================= */
 
 function addRef(){
- const code=newRefCode.value.trim()
- const name=newRefName.value.trim()
- if(!code) return
- const refs=loadRefs()
- refs[code]={name,color:colorFromString(code)}
- saveRefs(refs)
- logHist("REF ADD",code)
+ const c=newRefCode.value.trim()
+ if(!c) return
+ const r=loadRefs()
+ r[c]={name:newRefName.value,color:colorFromString(c)}
+ saveRefs(r)
+ logHist("REF ADD",c)
  renderRefs()
 }
 
 function renderRefs(){
- const refs=loadRefs()
- refBody.innerHTML=Object.entries(refs).map(([c,v])=>
+ const r=loadRefs()
+ refBody.innerHTML=Object.entries(r).map(([c,v])=>
  `<tr>
-   <td><span class="colorbox" style="background:${v.color}"></span></td>
-   <td>${c}</td>
-   <td contenteditable onblur="editRefName('${c}',this.innerText)">${v.name||""}</td>
+  <td><span class="colorbox" style="background:${v.color}"></span></td>
+  <td>${c}</td>
+  <td contenteditable onblur="editRef('${c}',this.innerText)">${v.name||""}</td>
  </tr>`).join("")
 }
 
-function editRefName(code,name){
- const refs=loadRefs()
- refs[code].name=name
- saveRefs(refs)
- logHist("REF EDIT",code)
+function editRef(c,n){
+ const r=loadRefs(); r[c].name=n; saveRefs(r)
+ logHist("REF EDIT",c)
 }
 
-/* ================= ROWS ================= */
+/* ================= DATA ================= */
+
+let DATA=loadData()
+let chart
 
 function addRow(){
-
- const f=addF.value
- const d=addDate.value
- const c=addCom.value
- const ht=addHt.value
- const t=addType.value
- const r=cleanRef(addRef.value)
-
+ const f=addF.value,d=addDate.value,c=addCom.value,ht=addHt.value,t=addType.value,r=cleanRef(addRef.value)
  DATA.push({arr:[f,d,c,ht,t,r],month:monthKey(d),ref:r})
-
- logHist("ADD",`${f} ${ht}`)
-
+ saveData()
+ logHist("ADD",f+" "+ht)
  render()
 }
 
 function deleteRow(i){
  if(!confirm("Supprimer ?")) return
  logHist("DELETE",DATA[i].arr.join(" | "))
- DATA.splice(i,1)
- render()
+ DATA.splice(i,1); saveData(); render()
 }
 
 function editRow(i){
-
  const r=DATA[i].arr
  tbody.children[i].innerHTML=r.map(v=>`<td><input value="${v}"></td>`).join("")+
  `<td><button onclick="saveRow(${i})">💾</button></td>`
 }
 
 function saveRow(i){
-
  const inputs=tbody.children[i].querySelectorAll("input")
- const old=DATA[i].arr.join(" | ")
-
  const arr=[...inputs].map(x=>x.value)
-
+ logHist("EDIT",DATA[i].arr.join(" | ")+" → "+arr.join(" | "))
  DATA[i]={arr,month:monthKey(arr[1]),ref:cleanRef(arr[5])}
-
- logHist("EDIT",`${old} → ${arr.join(" | ")}`)
-
+ saveData()
  render()
 }
 
@@ -251,8 +209,8 @@ function saveRow(i){
 
 function render(){
 
- let total=0
  tbody.innerHTML=""
+ let total=0
 
  DATA.forEach((r,i)=>{
  total+=eur(r.arr[3])
@@ -267,7 +225,6 @@ function render(){
  })
 
  totalEl.textContent=total.toLocaleString()+" €"
-
  buildChart()
 }
 
@@ -283,30 +240,45 @@ function buildChart(){
  })
 
  const months=Object.keys(map).sort()
- const labels=months
 
  const datasets=Object.keys(
  months.reduce((s,m)=>{Object.keys(map[m]).forEach(k=>s[k]=1);return s},{})
  ).map(ref=>({
    label:ref,
    data:months.map(m=>map[m][ref]||0),
-   backgroundColor:(refs[ref]||{}).color || colorFromString(ref)
+   backgroundColor:(refs[ref]||{}).color||colorFromString(ref)
  }))
 
  if(chart) chart.destroy()
 
  chart=new Chart(chartEl,{
  type:"bar",
- data:{labels,datasets},
+ data:{labels:months,datasets},
  options:{scales:{x:{stacked:true},y:{stacked:true}}}
  })
 }
 
-/* ================= LOAD CSV ================= */
+/* ================= EXPORT ================= */
+
+function exportCSV(){
+ const rows=[["Fournisseur","Date","Commentaire","HT","Type","Ref"],
+ ...DATA.map(r=>r.arr)]
+ const csv=rows.map(r=>r.join(";")).join("\n")
+ const blob=new Blob([csv])
+ const a=document.createElement("a")
+ a.href=URL.createObjectURL(blob)
+ a.download="export.csv"
+ a.click()
+}
+
+/* ================= LOAD CSV SOURCE ================= */
 
 fetch("data.csv")
 .then(r=>r.text())
-.then(csv=>Papa.parse(csv,{
+.then(csv=>{
+ syncTime.textContent=new Date().toLocaleString()
+
+ Papa.parse(csv,{
  skipEmptyLines:true,
  complete: res=>{
   res.data.slice(2).forEach(row=>{
@@ -317,14 +289,17 @@ fetch("data.csv")
      ref:cleanRef(row[7])
    })
   })
+  saveData()
   render()
  }
-}))
+})
+})
 
 /* ================= INIT ================= */
 
 renderRefs()
 renderHist()
+render()
 
 </script>
 </body>
