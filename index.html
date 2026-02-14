@@ -28,20 +28,16 @@ input,select,button{
 
 table{width:100%;border-collapse:collapse;background:white}
 th,td{padding:10px;border-bottom:1px solid #eee}
-th{background:#fafafa}
+th{background:#fafafa;cursor:pointer}
 
 .filter-btn{
- padding:6px 10px;
- border:1px solid #ccc;
- border-radius:8px;
- background:white;
- cursor:pointer;
- margin:3px;
+ padding:6px 10px;border:1px solid #ccc;border-radius:8px;
+ background:white;cursor:pointer;margin:3px
 }
-.filter-btn.active{
- background:#0071e3;
- color:white;
- border-color:#0071e3;
+.filter-btn.active{background:#0071e3;color:white;border-color:#0071e3}
+
+.pagination button{
+ padding:6px 10px;margin:2px;border-radius:8px;border:1px solid #ccc;background:white
 }
 </style>
 </head>
@@ -69,10 +65,17 @@ th{background:#fafafa}
 </div>
 
 <div class="card">
-<b>Années</b><br>
-<div id="yearFilters"></div>
-<b>Mois</b><br>
-<div id="monthFilters"></div>
+<b>Années</b><br><div id="yearFilters"></div>
+<b>Mois</b><br><div id="monthFilters"></div>
+</div>
+
+<div class="card">
+Lignes par page :
+<select id="pageSizeSel" onchange="setPageSize()">
+<option>10</option>
+<option>50</option>
+<option>100</option>
+</select>
 </div>
 
 <div class="card">Total : <b id="total"></b></div>
@@ -81,12 +84,19 @@ th{background:#fafafa}
 <table>
 <thead>
 <tr>
-<th>Fournisseur</th><th>Date</th><th>Commentaire</th>
-<th>€</th><th>Type</th><th>Réf</th><th></th>
+<th onclick="setSort(0)">Fournisseur</th>
+<th onclick="setSort(1)">Date</th>
+<th onclick="setSort(2)">Commentaire</th>
+<th onclick="setSort(3)">€</th>
+<th onclick="setSort(4)">Type</th>
+<th onclick="setSort(5)">Réf</th>
+<th></th>
 </tr>
 </thead>
 <tbody id="tbody"></tbody>
 </table>
+
+<div class="pagination" id="pager"></div>
 
 </div>
 
@@ -118,16 +128,10 @@ function showTab(id){
  document.getElementById(id).classList.add("active")
 }
 
-/* ---------- storage refs ---------- */
-
-const REF_KEY="refs_v4"
-let REFS = JSON.parse(localStorage.getItem(REF_KEY)||"{}")
-function saveRefs(){localStorage.setItem(REF_KEY,JSON.stringify(REFS))}
-
 /* ---------- utils ---------- */
 
-const eur = v => parseFloat((v||"").replace(/[^\d,.-]/g,"").replace(",", "."))||0
-const cleanRef = v => (v||"").trim()||"Sans référence"
+const eur=v=>parseFloat((v||"").replace(/[^\d,.-]/g,"").replace(",", "."))||0
+const cleanRef=v=>(v||"").trim()||"Sans référence"
 
 function parseDate(d){
  if(!d||!d.includes("/")) return {}
@@ -141,73 +145,32 @@ function monthKey(d){
  return p.a+"-"+String(p.m).padStart(2,"0")
 }
 
-/* ---------- data ---------- */
-
-let DATA=[]
-let chart
-
-/* ---------- time filters ---------- */
-
-const MONTH_NAMES=["Jan","Fév","Mar","Avr","Mai","Jun","Jul","Aoû","Sep","Oct","Nov","Déc"]
-let selYears=new Set()
-let selMonths=new Set()
-
-function toggleYear(y){
- selYears.has(y)?selYears.delete(y):selYears.add(y)
- render()
- renderYearButtons()
+function dateVal(d){
+ const p=parseDate(d)
+ return p.a ? new Date(p.a,p.m-1,p.j).getTime() : 0
 }
 
-function toggleMonth(m){
- selMonths.has(m)?selMonths.delete(m):selMonths.add(m)
- render()
- renderMonthButtons()
-}
+/* ---------- refs ---------- */
 
-function renderYearButtons(){
-
- const years=[...new Set(DATA.map(x=>x.y).filter(Boolean))].sort()
-
- yearFilters.innerHTML = years.map(y=>`
-  <button class="filter-btn ${selYears.has(y)?"active":""}"
-   onclick="toggleYear(${y})">${y}</button>`).join("")
-}
-
-function renderMonthButtons(){
-
- monthFilters.innerHTML = MONTH_NAMES.map((n,i)=>`
-  <button class="filter-btn ${selMonths.has(i+1)?"active":""}"
-   onclick="toggleMonth(${i+1})">${n}</button>`).join("")
-}
-
-function passTimeFilter(r){
- if(selYears.size && !selYears.has(r.y)) return false
- if(selMonths.size && !selMonths.has(r.m)) return false
- return true
-}
-
-/* ---------- references ---------- */
-
-function ensureRef(c){ if(!REFS[c]) REFS[c]="" }
+const REF_KEY="refs_v6"
+let REFS=JSON.parse(localStorage.getItem(REF_KEY)||"{}")
+function saveRefs(){localStorage.setItem(REF_KEY,JSON.stringify(REFS))}
+function ensureRef(c){if(!REFS[c]) REFS[c]=""}
 
 function refreshRefUI(){
-
- refBody.innerHTML = Object.entries(REFS).sort().map(([c,n])=>`
+ refBody.innerHTML=Object.entries(REFS).map(([c,n])=>`
  <tr>
   <td contenteditable onblur="editRefCode('${c}',this.innerText)">${c}</td>
   <td contenteditable onblur="editRefName('${c}',this.innerText)">${n}</td>
   <td><button onclick="deleteRef('${c}')">🗑</button></td>
  </tr>`).join("")
-
- addRefSelect.innerHTML = Object.keys(REFS).sort()
-  .map(c=>`<option>${c}</option>`).join("")
-
+ addRefSelect.innerHTML=Object.keys(REFS).map(c=>`<option>${c}</option>`).join("")
  saveRefs()
 }
 
 function addReference(){
  const c=newRefCode.value.trim()
- if(!c||REFS[c]){alert("Code invalide ou existant");return}
+ if(!c||REFS[c]){alert("Code invalide");return}
  REFS[c]=newRefName.value.trim()
  refreshRefUI()
 }
@@ -215,29 +178,101 @@ function addReference(){
 function editRefName(c,v){REFS[c]=v.trim();saveRefs()}
 
 function editRefCode(oldC,newC){
-
  newC=newC.trim()
- if(!newC|| (newC!==oldC && REFS[newC])){
-  alert("Code déjà existant"); refreshRefUI(); return
- }
-
- REFS[newC]=REFS[oldC]
- delete REFS[oldC]
-
- DATA.forEach(r=>{
-  if(r.ref===oldC){r.ref=newC; r.arr[5]=newC}
- })
-
- refreshRefUI()
- render()
+ if(!newC||(newC!==oldC&&REFS[newC])){alert("Doublon");refreshRefUI();return}
+ REFS[newC]=REFS[oldC]; delete REFS[oldC]
+ DATA.forEach(r=>{if(r.ref===oldC){r.ref=newC;r.arr[5]=newC}})
+ refreshRefUI(); render()
 }
 
 function deleteRef(c){
  if(!confirm("Supprimer ?")) return
  delete REFS[c]
- DATA.forEach(r=>{ if(r.ref===c){r.ref="Sans référence";r.arr[5]=r.ref}})
- refreshRefUI()
+ DATA.forEach(r=>{if(r.ref===c){r.ref="Sans référence";r.arr[5]=r.ref}})
+ refreshRefUI(); render()
+}
+
+/* ---------- data ---------- */
+
+let DATA=[]
+let chart
+
+/* ---------- filters ---------- */
+
+const MONTHS=["Jan","Fév","Mar","Avr","Mai","Jun","Jul","Aoû","Sep","Oct","Nov","Déc"]
+let selYears=new Set(), selMonths=new Set()
+
+function toggleYear(y){selYears.has(y)?selYears.delete(y):selYears.add(y);render();renderYearBtns()}
+function toggleMonth(m){selMonths.has(m)?selMonths.delete(m):selMonths.add(m);render();renderMonthBtns()}
+
+function renderYearBtns(){
+ const ys=[...new Set(DATA.map(x=>x.y).filter(Boolean))].sort()
+ yearFilters.innerHTML=ys.map(y=>btn(y,selYears.has(y),`toggleYear(${y})`)).join("")
+}
+
+function renderMonthBtns(){
+ monthFilters.innerHTML=MONTHS.map((n,i)=>btn(n,selMonths.has(i+1),`toggleMonth(${i+1})`)).join("")
+}
+
+function btn(label,on,fn){
+ return `<button class="filter-btn ${on?"active":""}" onclick="${fn}">${label}</button>`
+}
+
+function passTime(r){
+ if(selYears.size && !selYears.has(r.y)) return false
+ if(selMonths.size && !selMonths.has(r.m)) return false
+ return true
+}
+
+/* ---------- sorting ---------- */
+
+let sortCol=1
+let sortDir=-1   // récent d'abord
+
+function setSort(col){
+ if(col===1){
+   sortDir*=-1
+ }else{
+   sortCol=col
+   sortDir=1
+ }
  render()
+}
+
+function sortRows(rows){
+
+ rows.sort((a,b)=>{
+
+  // TRI PRINCIPAL = DATE DESC
+  const d = dateVal(b.arr[1]) - dateVal(a.arr[1])
+  if(d!==0) return d
+
+  // TRI SECONDAIRE
+  const A=a.arr[sortCol]
+  const B=b.arr[sortCol]
+
+  if(sortCol===3) return (eur(A)-eur(B))*sortDir
+  if(sortCol===1) return (dateVal(A)-dateVal(B))*sortDir
+
+  return A.localeCompare(B,"fr")*sortDir
+ })
+}
+
+/* ---------- pagination ---------- */
+
+let pageSize=10, curPage=1
+
+function setPageSize(){
+ pageSize=parseInt(pageSizeSel.value)
+ curPage=1
+ render()
+}
+
+function renderPager(total){
+ const pages=Math.ceil(total/pageSize)||1
+ pager.innerHTML=Array.from({length:pages},(_,i)=>
+  `<button onclick="curPage=${i+1};render()">${i+1}</button>`
+ ).join("")
 }
 
 /* ---------- achats ---------- */
@@ -249,37 +284,27 @@ function addRow(){
  const ht=addHt.value.trim()
  const t=addType.value.trim()
  const r=addRefSelect.value
-
  if(!f||!d||!ht){alert("Champs requis");return}
-
  const p=parseDate(d)
- DATA.push({
-  arr:[f,d,c,ht,t,r],
-  ref:r,
-  month:monthKey(d),
-  y:p.a,
-  m:p.m
- })
-
- render()
- renderYearButtons()
+ DATA.push({arr:[f,d,c,ht,t,r],ref:r,month:monthKey(d),y:p.a,m:p.m})
+ render(); renderYearBtns()
 }
 
-/* ---------- rows edit ---------- */
+/* ---------- edit rows ---------- */
 
 function editRow(i){
  const r=DATA[i].arr
- tbody.children[i].innerHTML = `
+ tbody.children[i].innerHTML=`
 <td><input value="${r[0]}"></td>
 <td><input value="${r[1]}"></td>
 <td><input value="${r[2]}"></td>
 <td><input value="${r[3]}"></td>
 <td><input value="${r[4]}"></td>
-<td>${refSelectHTML(r[5])}</td>
+<td>${refSel(r[5])}</td>
 <td><button onclick="saveRow(${i})">💾</button></td>`
 }
 
-function refSelectHTML(sel){
+function refSel(sel){
  return `<select>${
   Object.keys(REFS).map(k=>`<option ${k===sel?"selected":""}>${k}</option>`).join("")
  }</select>`
@@ -303,24 +328,27 @@ function deleteRow(i){
 
 function render(){
 
- let total=0, html=""
+ const rows=DATA.filter(passTime)
+ sortRows(rows)
 
- const rows = DATA.filter(passTimeFilter)
+ const total=rows.reduce((s,r)=>s+eur(r.arr[3]),0)
+ totalEl.textContent=total.toLocaleString()+" €"
 
- rows.forEach(r=>{
-  total+=eur(r.arr[3])
+ renderPager(rows.length)
+
+ const start=(curPage-1)*pageSize
+ const pageRows=rows.slice(start,start+pageSize)
+
+ tbody.innerHTML=pageRows.map(r=>{
   const i=DATA.indexOf(r)
-
-  html+=`<tr>
+  return `<tr>
    ${r.arr.map(v=>`<td>${v}</td>`).join("")}
    <td>
     <button onclick="editRow(${i})">✏️</button>
     <button onclick="deleteRow(${i})">🗑</button>
    </td></tr>`
- })
+ }).join("")
 
- tbody.innerHTML=html
- totalEl.textContent=total.toLocaleString()+" €"
  buildChart(rows)
 }
 
@@ -329,11 +357,11 @@ function render(){
 function buildChart(rows){
 
  const map={}
- for(const r of rows){
-  if(!r.month) continue
+ rows.forEach(r=>{
+  if(!r.month) return
   if(!map[r.month]) map[r.month]={}
   map[r.month][r.ref]=(map[r.month][r.ref]||0)+eur(r.arr[3])
- }
+ })
 
  const months=Object.keys(map).sort()
  const refs=[...new Set(rows.map(r=>r.ref))]
@@ -351,33 +379,26 @@ function buildChart(rows){
  })
 }
 
-/* ---------- csv load ---------- */
+/* ---------- load csv ---------- */
 
 fetch("data.csv")
 .then(r=>r.text())
 .then(csv=>Papa.parse(csv,{
  skipEmptyLines:true,
- complete: res => {
-
+ complete: res=>{
   res.data.slice(2).forEach(row=>{
    if(!row[0]) return
    const ref=cleanRef(row[7])
    ensureRef(ref)
-
    const p=parseDate(row[1])
-
    DATA.push({
     arr:[row[0],row[1],row[2],row[3],row[6],ref],
-    ref,
-    month:monthKey(row[1]),
-    y:p.a,
-    m:p.m
+    ref,month:monthKey(row[1]),y:p.a,m:p.m
    })
   })
-
   refreshRefUI()
-  renderYearButtons()
-  renderMonthButtons()
+  renderYearBtns()
+  renderMonthBtns()
   render()
  }
 }))
