@@ -73,7 +73,7 @@ body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;opa
 .btn-conf-y{background:var(--grl);color:var(--gr);border:1px solid rgba(14,125,107,.3);padding:3px 10px;font-size:11.5px;font-weight:600;border-radius:5px;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:all .15s}
 .btn-conf-n{background:var(--rel);color:var(--re);border:1px solid rgba(208,48,48,.3);padding:3px 10px;font-size:11.5px;font-weight:600;border-radius:5px;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:all .15s}
 
-.panel{background:var(--sf);border:1px solid var(--bd);border-radius:10px;overflow:hidden;box-shadow:var(--shadow);position:relative;z-index:1}
+.panel{background:var(--sf);border:1px solid var(--bd);border-radius:10px;box-shadow:var(--shadow);position:relative;z-index:1}
 .panel+.panel{margin-top:14px}
 .ph{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid var(--bd);background:var(--sf)}
 .pt{font-size:13px;font-weight:700;color:var(--tx)}
@@ -112,7 +112,7 @@ body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;opa
 .ms-btn:hover{border-color:var(--ac);color:var(--ac)}
 .ms-btn.active{background:var(--acl);border-color:rgba(14,125,107,.4);color:var(--ac)}
 .ms-arr{font-size:9px;opacity:.6}
-.ms-drop{display:none;position:absolute;top:calc(100% + 4px);left:0;min-width:180px;z-index:200;background:var(--sf);border:1px solid var(--bd);border-radius:10px;box-shadow:0 4px 16px rgba(13,27,46,.12);z-index:300;padding:6px;max-height:220px;overflow-y:auto}
+.ms-drop{display:none;position:fixed;min-width:180px;z-index:9999;background:var(--sf);border:1px solid var(--bd);border-radius:10px;box-shadow:0 4px 16px rgba(13,27,46,.12);padding:6px;max-height:220px;overflow-y:auto}
 .ms-drop.open{display:block}
 .ms-item{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer;font-size:12.5px;font-weight:500;color:var(--tx2);transition:background .1s;user-select:none}
 .ms-item:hover{background:var(--bg)}
@@ -255,13 +255,13 @@ input::placeholder{color:var(--tx3)}
     <button class="nav-item" onclick="showView('lots',this)"><span class="ni">🗂️</span><span class="nav-label-txt">Référence gestion</span></button>
     <button class="nav-item" onclick="showView('entreprises',this)"><span class="ni">🏢</span><span class="nav-label-txt">Fournisseurs / ST</span></button>
   </div></div>
-  <div class="s-foot"><div class="s-status"><div class="s-dot loading" id="sDot"></div><span class="s-status-txt" id="sTxt">…</span></div></div>
+  <div class="s-foot"><button class="btn btn-s btn-sm" onclick="reload()" style="width:calc(100% - 20px);margin:0 10px 8px;justify-content:center;gap:6px"><span>↻</span><span class="nav-label-txt">Actualiser</span></button><div class="s-status"><div class="s-dot loading" id="sDot"></div><span class="s-status-txt" id="sTxt">…</span></div></div>
 </aside>
 <button class="sidebar-tab" id="sTab" onclick="toggleSidebar()"><svg width="6" height="12" viewBox="0 0 6 12" fill="none"><path d="M5 1L1 6l4 5" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
 
 <div class="main" id="main">
   <div id="view-commandes" class="view active">
-    <div class="topbar"><div class="topbar-title">Commandes &amp; Factures</div><div class="ta"><button class="btn btn-s btn-sm" onclick="reload()">↻ Actualiser</button><button class="btn btn-p btn-sm" onclick="openPanel('commande')">+ Nouvelle commande</button></div></div>
+    <div class="topbar"><div class="topbar-title">Commandes &amp; Factures</div><div class="ta"><button class="btn btn-p btn-sm" onclick="openPanel('commande')">+ Nouvelle commande</button></div></div>
     <div class="content">
       <div class="kpi-grid">
         <div class="kpi kpi-e"><div class="kl"><div class="kl-dot" style="background:var(--ac)"></div>Engagé total</div><div class="kv" id="kE">—</div><div class="ks" id="kEs"></div></div>
@@ -274,7 +274,7 @@ input::placeholder{color:var(--tx3)}
             <div class="sb"><input id="srch" style="width:220px" placeholder="Rechercher fournisseur, description…" oninput="curPage=1;rCmd()"></div>
             <button class="btn btn-g btn-sm" onclick="clearF()">✕ Effacer les filtres</button>
           </div>
-          <div class="fb fb-row1">
+          <div class="fb fb-row1" style="overflow:visible;position:relative;z-index:100">
           <span class="fl">Lot</span>
           <div class="ms-wrap" id="msLot">
             <button class="ms-btn" onclick="toggleMs('msLot')"><span id="msLotLbl">Tous</span><span class="ms-arr">▾</span></button>
@@ -343,7 +343,7 @@ input::placeholder{color:var(--tx3)}
     <div class="topbar">
       <div class="topbar-title">Factures Sous-traitance</div>
       <div class="ta">
-        <button class="btn btn-s btn-sm" onclick="reload()">↻ Actualiser</button>
+        
         <button class="btn btn-p btn-sm" onclick="openNewFacST()">+ Nouvelle facture ST</button>
       </div>
     </div>
@@ -354,18 +354,18 @@ input::placeholder{color:var(--tx3)}
         <div class="kpi"><div class="kl"><div class="kl-dot" style="background:var(--wa)"></div>Reste à pointer</div><div class="kv o" id="stKR">—</div><div class="ks" id="stKRs"></div></div>
         <div class="kpi"><div class="kl"><div class="kl-dot" style="background:var(--tx3)"></div>Sous-traitants</div><div class="kv" id="stKN">—</div><div class="ks" id="stKNs"></div></div>
       </div>
-      <div class="panel" style="margin-bottom:0;border-radius:10px 10px 0 0;border-bottom:none">
-        <div class="sb-row" style="background:var(--bg)">
-          <div class="sb"><input id="stFQ" placeholder="Rechercher sous-traitant…" oninput="rST()"></div>
+      <div class="panel">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 16px 0;background:var(--bg)">
+          <div class="sb"><input id="stFQ" placeholder="Rechercher sous-traitant…" oninput="rST()" style="width:220px"></div>
           <button class="btn btn-g btn-sm" onclick="clearStF()">✕ Effacer les filtres</button>
         </div>
         <div class="fb fb-row1">
           <span class="fl">Entreprise</span>
-          <div class="ms-wrap" id="msStEnt">
-            <button class="ms-btn" onclick="toggleMs('msStEnt')"><span id="msStEntLbl">Toutes</span><span class="ms-arr">▾</span></button>
-            <div class="ms-drop" id="msStEntDrop"></div>
-          </div>
-          <div class="fsep"></div>
+          <select class="ana-sel" id="stEntSel" onchange="tStFltSel(this.value)" style="min-width:160px">
+            <option value="">Toutes</option>
+          </select>
+        </div>
+        <div class="fb fb-row2">
           <span class="fl">Pointage</span>
           <div style="display:flex;gap:4px">
             <button class="chip on" id="stFa"  onclick="setStSt('all')">Tous</button>
@@ -373,8 +373,8 @@ input::placeholder{color:var(--tx3)}
             <button class="chip"    id="stFp"  onclick="setStSt('pending')">En attente</button>
           </div>
         </div>
+        <div id="stContent"></div>
       </div>
-      <div id="stContent"></div>
     </div>
   </div>
   <div id="view-analyse-st" class="view">
@@ -615,7 +615,16 @@ function rFilters(){
 }
 function toggleMs(id){
   document.querySelectorAll(".ms-drop").forEach(d=>{if(d.id!==id+"Drop")d.classList.remove("open")})
-  document.getElementById(id+"Drop")?.classList.toggle("open")
+  const drop=document.getElementById(id+"Drop")
+  if(!drop)return
+  const btn=document.getElementById(id)?.querySelector(".ms-btn")
+  if(btn&&!drop.classList.contains("open")){
+    const r=btn.getBoundingClientRect()
+    drop.style.top=(r.bottom+4)+"px"
+    drop.style.left=r.left+"px"
+    drop.style.minWidth=r.width+"px"
+  }
+  drop.classList.toggle("open")
 }
 function clearMs(type){
   if(type==="lot")fLot.clear();else fSig.clear()
@@ -751,13 +760,14 @@ function cmdF(c,forceST){
     <div class="ff"><label>Signataire</label><select id="pS" onchange="tNS(this.value)"><option value="">—</option>${so}<option value="__new">+ Autre…</option></select></div>
   </div>
   <div class="ff" id="nSF" style="display:none"><label>Nouveau signataire</label><input id="pNS" placeholder="Initiales"></div>
+  <div class="ff"><label>Commentaires</label><textarea id="pNote" placeholder="Notes internes, remarques…" style="min-height:80px;resize:vertical;width:100%;box-sizing:border-box;font-family:inherit;font-size:13px;padding:8px 10px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);outline:none;line-height:1.5">${c?.Notes||""}</textarea></div>
   </div>`
 }
 
-function facF(f){const dv=f?.["Date réception"]?(f["Date réception"].includes("/")?f["Date réception"].split("/").reverse().join("-"):f["Date réception"]):"";return`<div class="fs"><div class="fs-title">Informations facture</div><div class="ff"><label>N° Facture</label><input id="pN" value="${f?.["N° Facture"]||""}" placeholder="FAC-2025-001"></div><div class="ff"><label>Montant HT *</label><input id="pMF" value="${f?.["Montant HT"]||""}" placeholder="0,00"></div><div class="ff"><label>Date de réception</label><input id="pDF" type="date" value="${dv}"></div></div>`}
+function facF(f){const dv=f?.["Date réception"]?(f["Date réception"].includes("/")?f["Date réception"].split("/").reverse().join("-"):f["Date réception"]):"";return`<div class="fs"><div class="fs-title">Informations facture</div><div class="ff"><label>N° Facture</label><input id="pN" value="${f?.["N° Facture"]||""}" placeholder="FAC-2025-001"></div><div class="ff"><label>Montant HT *</label><input id="pMF" value="${f?.["Montant HT"]||""}" placeholder="0,00"></div><div class="ff"><label>Date de réception</label><input id="pDF" type="date" value="${dv}"></div><div class="ff"><label>Commentaires</label><textarea id="pFNote" placeholder="Notes internes, remarques…" style="min-height:80px;resize:vertical;width:100%;box-sizing:border-box;font-family:inherit;font-size:13px;padding:8px 10px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);outline:none;line-height:1.5">${f?.Notes||""}</textarea></div></div>`}
 function tNS(v){document.getElementById("nSF").style.display=v==="__new"?"block":"none"}
-async function subCmd(isEdit){const fo=(document.getElementById("pF")?.value||"").trim(),lot=document.getElementById("pL")?.value,mt=(document.getElementById("pM")?.value||"").trim(),sv=document.getElementById("pS")?.value,sig=sv==="__new"?(document.getElementById("pNS")?.value||"").trim():sv,desc=(document.getElementById("pD")?.value||"").trim(),dt=document.getElementById("pDt")?.value;if(!fo||!mt){toast("Fournisseur et montant requis","error");return};const ty=document.getElementById("pTy")?.value||"";const data={fournisseur:fo,description:desc,lot,montant:mt,date:dt,signataire:sig,type:ty};if(isEdit){data.id=pData.id;const idx=C.findIndex(c=>c.ID===data.id);if(idx>=0)C[idx]={...C[idx],Fournisseur:fo,Description:desc,Lot:lot,Type:ty,"Montant HT":mt,Date:dt,Signataire:sig};closePanel();syncMeta();rAll();toast("Commande modifiée");apiPost("updateCommande",data)}else{const res=await apiPost("addCommande",data);const nid=res?.id||"CMD-"+Date.now();C.unshift({ID:nid,Fournisseur:fo,Description:desc,Lot:lot,Type:ty,"Montant HT":mt,Date:dt,Signataire:sig});closePanel();syncMeta();rAll();toast("Commande créée")}}
-async function subFac(isEdit){const num=(document.getElementById("pN")?.value||"").trim(),mt=(document.getElementById("pMF")?.value||"").trim(),dt=document.getElementById("pDF")?.value;if(!mt){toast("Montant requis","error");return};if(isEdit){const idx=F.findIndex(f=>f.ID===pData.id);if(idx>=0)F[idx]={...F[idx],"N° Facture":num,"Montant HT":mt,"Date réception":dt};closePanel();rAll();toast("Facture modifiée");apiPost("updateFacture",{id:pData.id,numero:num,montant:mt,dateReception:dt})}else{const cid=pData.id;const res=await apiPost("addFacture",{commandeId:cid,numero:num,montant:mt,dateReception:dt});const nid=res?.id||"FAC-"+Date.now();F.push({ID:nid,ID_Commande:cid,"N° Facture":num,"Montant HT":mt,"Date réception":dt,"Pointé":false,"Date pointage":""});closePanel();expId=cid;rAll();toast("Facture ajoutée")}}
+async function subCmd(isEdit){const fo=(document.getElementById("pF")?.value||"").trim(),lot=document.getElementById("pL")?.value,mt=(document.getElementById("pM")?.value||"").trim(),sv=document.getElementById("pS")?.value,sig=sv==="__new"?(document.getElementById("pNS")?.value||"").trim():sv,desc=(document.getElementById("pD")?.value||"").trim(),dt=document.getElementById("pDt")?.value,notes=(document.getElementById("pNote")?.value||"").trim();if(!fo||!mt){toast("Fournisseur et montant requis","error");return};const ty=document.getElementById("pTy")?.value||"";const data={fournisseur:fo,description:desc,lot,montant:mt,date:dt,signataire:sig,type:ty,notes};if(isEdit){data.id=pData.id;const idx=C.findIndex(c=>c.ID===data.id);if(idx>=0)C[idx]={...C[idx],Fournisseur:fo,Description:desc,Lot:lot,Type:ty,"Montant HT":mt,Date:dt,Signataire:sig,Notes:notes};closePanel();syncMeta();rAll();toast("Commande modifiée");apiPost("updateCommande",data)}else{const res=await apiPost("addCommande",data);const nid=res?.id||"CMD-"+Date.now();C.unshift({ID:nid,Fournisseur:fo,Description:desc,Lot:lot,Type:ty,"Montant HT":mt,Date:dt,Signataire:sig,Notes:notes});closePanel();syncMeta();rAll();toast("Commande créée")}}
+async function subFac(isEdit){const num=(document.getElementById("pN")?.value||"").trim(),mt=(document.getElementById("pMF")?.value||"").trim(),dt=document.getElementById("pDF")?.value,notes=(document.getElementById("pFNote")?.value||"").trim();if(!mt){toast("Montant requis","error");return};if(isEdit){const idx=F.findIndex(f=>f.ID===pData.id);if(idx>=0)F[idx]={...F[idx],"N° Facture":num,"Montant HT":mt,"Date réception":dt,Notes:notes};closePanel();rAll();toast("Facture modifiée");apiPost("updateFacture",{id:pData.id,numero:num,montant:mt,dateReception:dt,notes})}else{const cid=pData.id;const res=await apiPost("addFacture",{commandeId:cid,numero:num,montant:mt,dateReception:dt,notes});const nid=res?.id||"FAC-"+Date.now();F.push({ID:nid,ID_Commande:cid,"N° Facture":num,"Montant HT":mt,"Date réception":dt,Notes:notes,"Pointé":false,"Date pointage":""});closePanel();expId=cid;rAll();toast("Facture ajoutée")}}
 async function subCmdST(isEdit){
   const fo=(document.getElementById("pF")?.value||"").trim()
   const lot=document.getElementById("pL")?.value
@@ -766,17 +776,18 @@ async function subCmdST(isEdit){
   const sig=sv==="__new"?(document.getElementById("pNS")?.value||"").trim():sv
   const desc=(document.getElementById("pD")?.value||"").trim()
   const dt=document.getElementById("pDt")?.value
+  const notes=(document.getElementById("pNote")?.value||"").trim()
   if(!fo||!mt){toast("Fournisseur et montant requis","error");return}
-  const data={fournisseur:fo,description:desc,lot,montant:mt,date:dt,signataire:sig,type:"Sous-traitance"}
+  const data={fournisseur:fo,description:desc,lot,montant:mt,date:dt,signataire:sig,type:"Sous-traitance",notes}
   if(isEdit){
     data.id=pData.id
     const idx=C.findIndex(c=>c.ID===data.id)
-    if(idx>=0)C[idx]={...C[idx],Fournisseur:fo,Description:desc,Lot:lot,Type:"Sous-traitance","Montant HT":mt,Date:dt,Signataire:sig}
+    if(idx>=0)C[idx]={...C[idx],Fournisseur:fo,Description:desc,Lot:lot,Type:"Sous-traitance","Montant HT":mt,Date:dt,Signataire:sig,Notes:notes}
     closePanel();syncMeta();rST();rAnaST();toast("Commande ST modifiée");apiPost("updateCommande",data)
   }else{
     const res=await apiPost("addCommande",data)
     const nid=res?.id||"CMD-"+Date.now()
-    C.unshift({ID:nid,Fournisseur:fo,Description:desc,Lot:lot,Type:"Sous-traitance","Montant HT":mt,Date:dt,Signataire:sig})
+    C.unshift({ID:nid,Fournisseur:fo,Description:desc,Lot:lot,Type:"Sous-traitance","Montant HT":mt,Date:dt,Signataire:sig,Notes:notes})
     closePanel();syncMeta();rST();rAnaST();toast("Commande ST créée")
   }
 }
@@ -923,7 +934,7 @@ function rST(){
   }).sort((a,b)=>a[0].localeCompare(b[0]))
 
   el.innerHTML=`
-  <div class="panel" style="overflow:auto">
+  <div class="tbl-wrap">
     <table class="tbl" style="width:100%">
       <thead><tr>
         <th style="width:32px"></th>
@@ -1172,11 +1183,12 @@ async function subFacForST(nom){
   const num=(document.getElementById("pN")?.value||"").trim()
   const mt=(document.getElementById("pMF")?.value||"").trim()
   const dt=document.getElementById("pDF")?.value
+  const notes=(document.getElementById("pFNote")?.value||"").trim()
   if(!mt){toast("Montant requis","error");return}
   const stKey="ST:"+nom
-  const fRes=await apiPost("addFacture",{commandeId:stKey,numero:num,montant:mt,dateReception:dt})
+  const fRes=await apiPost("addFacture",{commandeId:stKey,numero:num,montant:mt,dateReception:dt,notes})
   const nid=fRes?.id||"FST-"+Date.now()
-  F.push({ID:nid,ID_Commande:stKey,"N° Facture":num,"Montant HT":mt,"Date réception":dt||"","Pointé":false,"Date pointage":""})
+  F.push({ID:nid,ID_Commande:stKey,"N° Facture":num,"Montant HT":mt,"Date réception":dt||"",Notes:notes,"Pointé":false,"Date pointage":""})
   expId=nom
   closePanel();rST();toast("Facture ajoutée")
 }
@@ -1207,11 +1219,12 @@ async function subFacSTNew(){
   const num=(document.getElementById("pN")?.value||"").trim()
   const mt=(document.getElementById("pMF")?.value||"").trim()
   const dt=document.getElementById("pDF")?.value
+  const notes=(document.getElementById("pFNote")?.value||"").trim()
   if(!mt){toast("Montant requis","error");return}
   const stKey="ST:"+nom
-  const fRes=await apiPost("addFacture",{commandeId:stKey,numero:num,montant:mt,dateReception:dt})
+  const fRes=await apiPost("addFacture",{commandeId:stKey,numero:num,montant:mt,dateReception:dt,notes})
   const nid=fRes?.id||"FST-"+Date.now()
-  F.push({ID:nid,ID_Commande:stKey,"N° Facture":num,"Montant HT":mt,"Date réception":dt||"","Pointé":false,"Date pointage":""})
+  F.push({ID:nid,ID_Commande:stKey,"N° Facture":num,"Montant HT":mt,"Date réception":dt||"",Notes:notes,"Pointé":false,"Date pointage":""})
   expId=nom
   closePanel();rST();toast("Facture ajoutée")
 }
@@ -1279,22 +1292,21 @@ function delST(nom){
 
 
 function rStFilters(){
-  const stC=C.filter(c=>c.Type==="Sous-traitance")
-  const noms=[...new Set(stC.map(c=>c.Fournisseur).filter(Boolean))].sort()
-  const ed=document.getElementById("msStEntDrop")
-  if(ed){
-    ed.innerHTML=`<div class="ms-all" onclick="clearStMs()">✕ Tout désélectionner</div><div class="ms-sep"></div>`+
-      noms.map(n=>`<label class="ms-item${fStEnt.has(n)?" checked":""}"><input type="checkbox" ${fStEnt.has(n)?"checked":""} onchange="tStFlt('${n}',this.checked)"><span>${n}</span></label>`).join("")
-    const lbl=document.getElementById("msStEntLbl")
-    if(lbl)lbl.textContent=fStEnt.size?[...fStEnt].join(", "):"Toutes"
-    document.getElementById("msStEnt")?.querySelector(".ms-btn")?.classList.toggle("active",fStEnt.size>0)
+  const fromC=C.filter(c=>c.Type==="Sous-traitance").map(c=>c.Fournisseur).filter(Boolean)
+  const fromF=F.filter(f=>f.ID_Commande?.startsWith("ST:")).map(f=>f.ID_Commande.slice(3))
+  const noms=[...new Set([...fromC,...fromF])].sort()
+  const sel=document.getElementById("stEntSel")
+  if(sel){
+    const cur=sel.value
+    sel.innerHTML=`<option value="">Toutes</option>`+noms.map(n=>`<option value="${n}"${cur===n?" selected":""}>${n}</option>`).join("")
   }
   ;[["stFa","all"],["stFpt","pointed"],["stFp","pending"]].forEach(([id,v])=>document.getElementById(id)?.classList.toggle("on",fStSt===v))
 }
 function tStFlt(val,checked){checked?fStEnt.add(val):fStEnt.delete(val);rST()}
+function tStFltSel(val){fStEnt.clear();if(val)fStEnt.add(val);rST()}
 function clearStMs(){fStEnt.clear();rST()}
 function setStSt(v){fStSt=v;rST()}
-function clearStF(){fStEnt.clear();fStSt="all";const q=document.getElementById("stFQ");if(q)q.value="";rST()}
+function clearStF(){fStEnt.clear();fStSt="all";const q=document.getElementById("stFQ");if(q)q.value="";const s=document.getElementById("stEntSel");if(s)s.value="";rST()}
 
 // ── Entreprises CRUD ─────────────────────────────────────────────
 function saveEnts(){localStorage.setItem("ents_v1",JSON.stringify(ENTREPRISES))}
@@ -1395,6 +1407,8 @@ function saveLotName(code,val){LOTS[code]=val;saveLots()}
 function rLots(){const g=document.getElementById("lgrid");if(!g)return;const en=Object.entries(LOTS);if(!en.length){g.innerHTML=`<div style="grid-column:1/-1;color:var(--tx3);font-size:13px">Aucun lot.</div>`;return};g.innerHTML=en.map(([c,n])=>`<div class="li"><span class="lc">${c}</span><input class="ln-edit" value="${n||""}" placeholder="Désignation…" onchange="saveLotName('${c}',this.value)"><button class="btn btn-g btn-xs" onclick="delLot('${c}')">🗑</button></div>`).join("")}
 C=[{ID:"CMD-001",Fournisseur:"ALTRAD",Description:"Échafaudage ascenseur R2",Lot:"S1G","Montant HT":"2250",Date:"2023-04-24",Signataire:"LDE"},{ID:"CMD-002",Fournisseur:"AIDF",Description:"Installation panneaux voirie",Lot:"F3","Montant HT":"656.70",Date:"2023-04-24",Signataire:"LDE"},{ID:"CMD-003",Fournisseur:"MORNING",Description:"Loyer bureau — Juin",Lot:"S1E","Montant HT":"777.10",Date:"2023-05-22",Signataire:"LDE"},{ID:"CMD-004",Fournisseur:"ECR STUDIO",Description:"Renders présentation",Lot:"F14","Montant HT":"2400",Date:"2023-06-08",Signataire:"LDE"},{ID:"CMD-005",Fournisseur:"ECODROP",Description:"Retrait déchets",Lot:"S1A","Montant HT":"216.75",Date:"2023-07-18",Signataire:"MLP"},{ID:"CMD-006",Fournisseur:"DANIELE VEGRO",Description:"Présentation Témoins",Lot:"F14","Montant HT":"1500",Date:"2023-03-29",Signataire:"LDE"},{ID:"CMD-007",Fournisseur:"BTP Consultant",Description:"PV conformité",Lot:"S1E","Montant HT":"600",Date:"2023-03-21",Signataire:"LDE"},{ID:"CMD-008",Fournisseur:"ALTRAD",Description:"Échafaudage R3",Lot:"S1G","Montant HT":"1800",Date:"2023-07-03",Signataire:"MLP"},{ID:"CMD-009",Fournisseur:"MAUFFREY",Description:"Transport matériaux",Lot:"S1A","Montant HT":"430",Date:"2023-05-15",Signataire:"AG"}]
 F=[{ID:"FAC-001",ID_Commande:"CMD-001","N° Facture":"2301612","Montant HT":"2250","Date réception":"2023-04-28","Pointé":true,"Date pointage":"02/05/2023 09:30"},{ID:"FAC-002",ID_Commande:"CMD-003","N° Facture":"2023-05-039","Montant HT":"777.10","Date réception":"2023-05-25","Pointé":false,"Date pointage":""},{ID:"FAC-003",ID_Commande:"CMD-004","N° Facture":"","Montant HT":"1200","Date réception":"2023-06-10","Pointé":false,"Date pointage":""},{ID:"FAC-004",ID_Commande:"CMD-004","N° Facture":"","Montant HT":"1200","Date réception":"2023-07-01","Pointé":true,"Date pointage":"05/07/2023 14:15"},{ID:"FAC-005",ID_Commande:"CMD-006","N° Facture":"23.08","Montant HT":"1500","Date réception":"2023-04-03","Pointé":true,"Date pointage":"10/04/2023 11:00"},{ID:"FAC-006",ID_Commande:"CMD-007","N° Facture":"","Montant HT":"600","Date réception":"2023-03-25","Pointé":false,"Date pointage":""},{ID:"FAC-007",ID_Commande:"CMD-008","N° Facture":"2307881","Montant HT":"1800","Date réception":"2023-07-10","Pointé":false,"Date pointage":""},{ID:"FAC-008",ID_Commande:"CMD-009","N° Facture":"MAU-0453","Montant HT":"430","Date réception":"2023-05-18","Pointé":true,"Date pointage":"22/05/2023 10:00"}]
+document.addEventListener("scroll",()=>document.querySelectorAll(".ms-drop").forEach(d=>d.classList.remove("open")),true)
+window.addEventListener("resize",()=>document.querySelectorAll(".ms-drop").forEach(d=>d.classList.remove("open")))
 startPolling(90000)
 reload()
 </script>
